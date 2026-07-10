@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { completeOnboardingAction } from "@/lib/actions/onboarding";
@@ -33,12 +33,22 @@ export function OnboardingForm() {
   );
   const { update } = useSession();
   const router = useRouter();
+  const handledSuccess = useRef(false);
 
   useEffect(() => {
-    if (state?.success) {
-      void update().then(() => router.push("/dashboard"));
+    if (state?.success && !handledSuccess.current) {
+      handledSuccess.current = true;
+      // next-auth's update() only POSTs (refreshing the JWT via the
+      // `trigger: "update"` codepath) when given a truthy payload —
+      // update() with no args is a no-op GET and leaves the stale,
+      // not-yet-onboarded JWT in place.
+      void update({}).then(() => router.push("/dashboard"));
     }
-  }, [state, update, router]);
+    // update/router intentionally omitted: next-auth's `update` is not a
+    // stable reference across session refetches, so including it here
+    // re-fires this effect and would call update() forever without the guard.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <form action={formAction} className="space-y-5">

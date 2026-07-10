@@ -143,7 +143,10 @@ export function LessonStepper({
                 alreadyComplete={isComplete}
                 onDone={async (stageAdvanced) => {
                   if (stageAdvanced) {
-                    await update();
+                    // update() needs a truthy payload to actually refresh
+                    // the JWT (see onboarding-form.tsx) — a no-arg call
+                    // just re-reads the stale session.
+                    await update({});
                     setCelebrating(true);
                   } else {
                     router.refresh();
