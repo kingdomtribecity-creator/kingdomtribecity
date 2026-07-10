@@ -1,0 +1,536 @@
+// Kingdom Tribe City — data architecture
+// Modeled for the full ecosystem now; UI depth varies by module (see docs/ROADMAP.md)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Identity & Auth (Auth.js compatible)
+// ─────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  GUEST
+  STUDENT
+  MENTOR
+  ADMIN
+}
+
+enum Stage {
+  PLANTED
+  ROOTED
+  FORMED
+  FRUITFUL
+  SENT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+
+  role  Role  @default(STUDENT)
+  stage Stage @default(PLANTED)
+
+  sphereOfInfluence String?
+  bio               String?
+  onboardedAt       DateTime?
+
+  accounts Account[]
+  sessions Session[]
+
+  enrollments       Enrollment[]
+  lessonProgress    LessonProgress[]
+  reflectionEntries ReflectionEntry[]
+  journalEntries    JournalEntry[]
+  certificates      Certificate[]
+
+  tribeMemberships   TribeMembership[]
+  mentoredTribes     Tribe[]             @relation("TribeMentor")
+  discussionPosts    DiscussionPost[]
+  discussionComments DiscussionComment[]
+  prayerRequests     PrayerRequest[]
+  testimonies        Testimony[]
+
+  eventRegistrations EventRegistration[]
+  transactions       Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([stage])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// LMS — Programs / Courses / Modules / Lessons
+// ─────────────────────────────────────────────────────────────────────────
+
+enum ProgramSlug {
+  PLANTED_AND_ROOTED
+  YOUNG_AND_YIELDED
+  KINGDOM_WARRIOR_WOMAN
+  KINGDOM_LEADERS
+}
+
+model Program {
+  id          String      @id @default(cuid())
+  slug        ProgramSlug @unique
+  name        String
+  tagline     String
+  description String
+  heroImage   String?
+
+  courses Course[]
+  events  Event[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Course {
+  id          String  @id @default(cuid())
+  programId   String
+  slug        String  @unique
+  title       String
+  subtitle    String?
+  description String
+  stage       Stage
+  coverImage  String?
+  order       Int     @default(0)
+  published   Boolean @default(true)
+
+  program      Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  modules      Module[]
+  enrollments  Enrollment[]
+  certificates Certificate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([programId])
+}
+
+model Module {
+  id          String  @id @default(cuid())
+  courseId    String
+  title       String
+  description String?
+  order       Int     @default(0)
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([courseId])
+}
+
+model Lesson {
+  id       String @id @default(cuid())
+  moduleId String
+  slug     String
+  title    String
+  summary  String?
+  order    Int    @default(0)
+
+  teachingVideoUrl String?
+  teachingAudioUrl String?
+  teachingBody     String?
+
+  scriptureRefs       String[]
+  scriptureText       String?
+  reflectionQuestions String[]
+  assignmentPrompt    String?
+  journalPrompt       String?
+
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  progress          LessonProgress[]
+  reflectionEntries ReflectionEntry[]
+  journalEntries    JournalEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([moduleId, slug])
+  @@index([moduleId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+model Enrollment {
+  id       String           @id @default(cuid())
+  userId   String
+  courseId String
+  status   EnrollmentStatus @default(ACTIVE)
+
+  enrolledAt  DateTime  @default(now())
+  completedAt DateTime?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+}
+
+enum LessonStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model LessonProgress {
+  id       String       @id @default(cuid())
+  userId   String
+  lessonId String
+  status   LessonStatus @default(NOT_STARTED)
+
+  teachingViewedAt DateTime?
+  reflectionDoneAt DateTime?
+  assignmentDoneAt DateTime?
+  journalDoneAt    DateTime?
+  completedAt      DateTime?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([lessonId])
+}
+
+model ReflectionEntry {
+  id       String @id @default(cuid())
+  userId   String
+  lessonId String
+  answers  Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+model JournalEntry {
+  id       String  @id @default(cuid())
+  userId   String
+  lessonId String?
+  content  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson? @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model Certificate {
+  id       String   @id @default(cuid())
+  userId   String
+  courseId String
+  issuedAt DateTime @default(now())
+  serial   String   @unique @default(cuid())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Community — Cohorts / Tribes / Discussions / Prayer / Testimonies
+// ─────────────────────────────────────────────────────────────────────────
+
+model Cohort {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  startDate DateTime
+  active    Boolean  @default(true)
+
+  tribes Tribe[]
+
+  createdAt DateTime @default(now())
+}
+
+model Tribe {
+  id       String  @id @default(cuid())
+  cohortId String
+  slug     String  @unique
+  name     String
+  mentorId String?
+
+  cohort  Cohort            @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  mentor  User?             @relation("TribeMentor", fields: [mentorId], references: [id], onDelete: SetNull)
+  members TribeMembership[]
+
+  discussionPosts DiscussionPost[]
+  prayerRequests  PrayerRequest[]
+
+  createdAt DateTime @default(now())
+
+  @@index([cohortId])
+}
+
+model TribeMembership {
+  id       String   @id @default(cuid())
+  userId   String
+  tribeId  String
+  joinedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tribe Tribe @relation(fields: [tribeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tribeId])
+  @@index([tribeId])
+}
+
+model DiscussionPost {
+  id      String @id @default(cuid())
+  tribeId String
+  userId  String
+  body    String
+
+  tribe    Tribe               @relation(fields: [tribeId], references: [id], onDelete: Cascade)
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments DiscussionComment[]
+
+  createdAt DateTime @default(now())
+
+  @@index([tribeId, createdAt])
+}
+
+model DiscussionComment {
+  id     String @id @default(cuid())
+  postId String
+  userId String
+  body   String
+
+  post DiscussionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+}
+
+enum PrayerStatus {
+  OPEN
+  ANSWERED
+}
+
+model PrayerRequest {
+  id      String       @id @default(cuid())
+  tribeId String
+  userId  String
+  body    String
+  status  PrayerStatus @default(OPEN)
+
+  tribe Tribe @relation(fields: [tribeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([tribeId, status])
+}
+
+model Testimony {
+  id       String  @id @default(cuid())
+  userId   String
+  title    String
+  body     String
+  featured Boolean @default(false)
+  approved Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([approved, featured])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Events
+// ─────────────────────────────────────────────────────────────────────────
+
+model Speaker {
+  id    String  @id @default(cuid())
+  name  String
+  title String?
+  bio   String?
+  image String?
+
+  events Event[]
+}
+
+model Event {
+  id           String    @id @default(cuid())
+  programId    String?
+  slug         String    @unique
+  title        String
+  description  String
+  location     String?
+  startsAt     DateTime
+  endsAt       DateTime?
+  coverImage   String?
+  recordingUrl String?
+
+  program  Program?  @relation(fields: [programId], references: [id], onDelete: SetNull)
+  speakers Speaker[]
+
+  registrations EventRegistration[]
+
+  createdAt DateTime @default(now())
+
+  @@index([startsAt])
+}
+
+model EventRegistration {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  attended  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Resource Library
+// ─────────────────────────────────────────────────────────────────────────
+
+enum ResourceType {
+  TEACHING
+  SERMON
+  ARTICLE
+  STUDY
+  DEVOTIONAL
+}
+
+enum ResourceCategory {
+  IDENTITY
+  PRAYER
+  LEADERSHIP
+  PURPOSE
+  RELATIONSHIPS
+  SPIRITUAL_GROWTH
+}
+
+model Resource {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  title       String
+  description String
+  type        ResourceType
+  category    ResourceCategory
+  mediaUrl    String?
+  coverImage  String?
+  published   Boolean          @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([category])
+  @@index([type])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Giving
+// ─────────────────────────────────────────────────────────────────────────
+
+enum GivingType {
+  ONE_TIME
+  RECURRING
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+model Transaction {
+  id                      String             @id @default(cuid())
+  userId                  String?
+  amountCents             Int
+  currency                String             @default("usd")
+  type                    GivingType
+  designation             String?
+  status                  TransactionStatus  @default(PENDING)
+  stripePaymentIntentId   String?            @unique
+  stripeCheckoutSessionId String?            @unique
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Admin / Ops
+// ─────────────────────────────────────────────────────────────────────────
+
+model Announcement {
+  id        String  @id @default(cuid())
+  title     String
+  body      String
+  pinned    Boolean @default(false)
+  published Boolean @default(true)
+
+  createdAt DateTime @default(now())
+}

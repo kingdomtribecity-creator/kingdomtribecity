@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kingdom Tribe City
 
-## Getting Started
+The operating system for spiritual formation — a platform that plants, roots, forms, and sends Kingdom Ambassadors into every sphere of influence.
 
-First, run the development server:
+Read the founding docs first:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- [`docs/PRD.md`](docs/PRD.md) — product requirements & vision
+- [`docs/USER_JOURNEYS.md`](docs/USER_JOURNEYS.md) — key user journeys
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — application & data architecture
+- [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) — visual identity & components
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — what's deep vs. scaffolded, and what's next
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Next.js 16 (App Router) · TypeScript · Tailwind v4 + shadcn/ui (Radix) · Prisma 7 + PostgreSQL · Auth.js v5 · Stripe
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Getting started
 
-## Learn More
+1. **Database** — set `DATABASE_URL` in `.env` to a Postgres connection string (a hosted instance like Neon works well; a local Postgres via Docker also works).
+2. Install dependencies and set up the schema:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   npm install
+   npx prisma migrate dev
+   npx prisma db seed
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Run the dev server:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   npm run dev
+   ```
 
-## Deploy on Vercel
+4. Open [http://localhost:3000](http://localhost:3000).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Demo logins
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Seeded by `prisma/seed.ts`, password `KingdomDemo!23` for all:
+
+| Email | Role |
+|---|---|
+| `admin@kingdomtribecity.org` | Admin |
+| `mentor.deborah@kingdomtribecity.org` | Mentor (Tribe Deborah) |
+| `student@kingdomtribecity.org` | Student (mid-course, in Tribe Deborah) |
+
+### Environment variables
+
+See `.env` for the full list. `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` are optional in development — the `/give` flow degrades gracefully with a clear message when Stripe isn't configured.
+
+## Scripts
+
+- `npm run dev` — start the dev server (Turbopack)
+- `npm run build` / `npm run start` — production build & serve
+- `npm run lint` — ESLint
+- `npx prisma studio` — browse the database
