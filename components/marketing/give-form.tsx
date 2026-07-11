@@ -10,13 +10,23 @@ import { cn } from "@/lib/utils";
 
 const PRESETS = [25, 50, 100, 250];
 
-export function GiveForm() {
+export function GiveForm({
+  stripeEnabled = true,
+  paystackEnabled = false,
+}: {
+  stripeEnabled?: boolean;
+  paystackEnabled?: boolean;
+}) {
   const [state, formAction, pending] = useActionState(
     createGivingCheckoutAction,
     undefined
   );
   const [amount, setAmount] = useState(50);
   const [type, setType] = useState<"ONE_TIME" | "RECURRING">("ONE_TIME");
+  const [provider, setProvider] = useState<"stripe" | "paystack">(
+    stripeEnabled ? "stripe" : "paystack"
+  );
+  const showProviderChoice = stripeEnabled && paystackEnabled;
 
   return (
     <form action={formAction} className="space-y-6">
@@ -30,6 +40,19 @@ export function GiveForm() {
         </Tabs>
         <input type="hidden" name="type" value={type} />
       </div>
+
+      {showProviderChoice && (
+        <div className="space-y-2">
+          <Label>Payment method</Label>
+          <Tabs value={provider} onValueChange={(v) => setProvider(v as typeof provider)}>
+            <TabsList>
+              <TabsTrigger value="stripe">Card (Stripe)</TabsTrigger>
+              <TabsTrigger value="paystack">Paystack</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+      <input type="hidden" name="provider" value={provider} />
 
       <div className="space-y-2">
         <Label>Amount</Label>

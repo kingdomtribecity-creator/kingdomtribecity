@@ -13,6 +13,7 @@ import {
   FolderOpen,
   ShieldCheck,
   Layers,
+  Plug,
 } from "lucide-react";
 import type { Role } from "@/lib/generated/prisma/enums";
 
@@ -26,6 +27,7 @@ const LINKS: { href: string; label: string; icon: typeof LayoutDashboard; roles:
   { href: "/admin/cohorts", label: "Cohorts & Tribes", icon: UsersRound, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER"] },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER"] },
   { href: "/admin/settings/roles", label: "Roles & Permissions", icon: ShieldCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { href: "/admin/settings/integrations", label: "Integrations", icon: Plug, roles: ["SUPER_ADMIN"] },
 ];
 
 export function AdminNav({ role }: { role: Role }) {

@@ -7,7 +7,7 @@
 - **Prisma ORM 7** + **PostgreSQL** (hosted on Neon). Prisma 7 requires a driver adapter for runtime queries — see `lib/prisma.ts`, which uses `@prisma/adapter-pg`. CLI/migrate connection config lives in `prisma.config.ts`.
 - **Auth.js v5** (`next-auth`) with the Credentials provider (email + password) and the Prisma adapter, JWT sessions carrying `id`, `role`, `stage`, `onboarded`.
 - **Route protection**: `proxy.ts` (Next 16 renamed `middleware.ts` → `proxy.ts`) guards `/dashboard`, `/learn`, `/tribe`, `/admin`. Proxy is a fast, coarse gate only — every server action and route handler re-checks authorization via `lib/rbac.ts`, because proxy coverage can silently drop on refactors.
-- **Stripe** for giving and paid-course checkout (test mode), webhook at `/api/webhooks/stripe` branches on `session.metadata.kind` to update either a `Transaction` or an `Enrollment`.
+- **Stripe** and **Paystack** for giving and paid-course checkout (test mode), each with their own webhook (`/api/webhooks/stripe`, `/api/webhooks/paystack`) that branches on a `kind` metadata field to update either a `Transaction` or an `Enrollment`. Stripe is configured via `.env`; Paystack is configured at runtime — see "Admin Integrations" below.
 - **Cloudflare R2** (S3-compatible) for media storage — see "Media & storage pipeline" below.
 
 ## Why Server Actions over hand-rolled API routes
@@ -42,6 +42,16 @@ Client-supplied role/permission state is never trusted — role/stage come from 
 **Serving**: `publicUrlForKey()` prefers a real public bucket domain (`R2_PUBLIC_URL`, set once a custom domain or the R2.dev subdomain is configured in the Cloudflare dashboard) and falls back to `/api/media/[...key]` — a Route Handler that authenticates to the private bucket with the same credentials and streams the object out, so uploads work from day one even before the bucket is public. Swapping in `R2_PUBLIC_URL` later needs no code change.
 
 Both `lib/r2.ts` (`r2Configured`) and `lib/stripe.ts` (`stripeConfigured`) follow the same pattern: the app builds and runs without those credentials, degrading the specific feature gracefully (an "storage not connected yet" state in the uploader, a clear error in the give flow) rather than crashing.
+
+## Admin Integrations (runtime-editable secrets)
+
+Unlike Stripe/R2 (env-var, deploy-time), the `Integration` model lets a **Super Admin only** (`requireSuperAdmin()` in `lib/rbac.ts` — the first single-role, non-data-driven gate outside the existing `requireAdmin()`/`requireMentorOrAdmin()` pattern) configure Email (Resend, Gmail), Payments (Paystack), AI (Anthropic, OpenAI), and SMS (Termii) providers from `/admin/settings/integrations`, with changes taking effect immediately — no redeploy.
+
+- **Storage**: one `Integration` row per `(type, provider)`, `config Json` for non-secret fields (from-address, model, currency…) and `secretsEncrypted String?` for API keys, encrypted with AES-256-GCM via `lib/crypto.ts` (key from `INTEGRATIONS_ENCRYPTION_KEY`). Secrets are never sent back to the browser after saving — the settings form always renders blank with a "saved" hint.
+- **Exclusivity**: EMAIL and AI are exclusive — enabling one provider disables the others of that type (exactly one active sender/model). PAYMENTS and SMS are not — Stripe and Paystack can both be enabled simultaneously, and calling code (`/give`, course purchase) shows a provider picker only when more than one is actually available.
+- **`lib/integrations.ts`** is the read-side API every consumer goes through: `getIntegrationSecrets()` (decrypt, for admin "Test" actions, ignores `enabled`), `getActiveIntegration()` (the one enabled EMAIL/AI row), `getEnabledIntegrations()` / `isIntegrationEnabled()` (PAYMENTS/SMS).
+- **Provider wrappers** (`lib/email.ts`, `lib/termii.ts`, `lib/ai-providers.ts`, `lib/paystack.ts`) are thin, stateless functions that take already-decrypted config — they don't know about the `Integration` table themselves, keeping the encryption/storage concern separate from the "how do I call this provider's API" concern.
+- **Paystack** mirrors the existing Stripe pattern closely: `initializePaystackTransaction()` returns a hosted checkout URL (like Stripe's Checkout Session `url`), and `/api/webhooks/paystack` verifies `x-paystack-signature` (HMAC-SHA512, key looked up from the DB rather than an env var) and branches on `metadata.kind` exactly like the Stripe webhook. `Transaction`/`Enrollment` both carry a `provider: PaymentProvider` discriminator plus provider-specific reference columns.
 
 ## Data model
 

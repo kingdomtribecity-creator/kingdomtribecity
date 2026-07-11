@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Circle, Award, Lock } from "lucide-react";
 import { enrollInCourseAction } from "@/lib/actions/lms";
+import { stripeConfigured } from "@/lib/stripe";
+import { isIntegrationEnabled } from "@/lib/integrations";
 import { cn } from "@/lib/utils";
 
 export default async function CourseDetailPage({
@@ -44,6 +46,9 @@ export default async function CourseDetailPage({
     (l) => progressByLesson.get(l.id)?.status !== "COMPLETED"
   );
   const enrollAction = enrollInCourseAction.bind(null, course.id);
+  const paystackEnabled = isPaidCourse && !hasAccess
+    ? await isIntegrationEnabled("PAYMENTS", "paystack")
+    : false;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -59,7 +64,12 @@ export default async function CourseDetailPage({
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         {isPaidCourse && !hasAccess ? (
-          <PurchaseCourseButton courseId={course.id} priceCents={course.priceCents ?? 0} />
+          <PurchaseCourseButton
+            courseId={course.id}
+            priceCents={course.priceCents ?? 0}
+            stripeEnabled={stripeConfigured}
+            paystackEnabled={paystackEnabled}
+          />
         ) : !isEnrolled ? (
           <form action={enrollAction}>
             <Button type="submit">Enroll in this course</Button>

@@ -72,6 +72,7 @@ model User {
   createdResources Resource[]     @relation("ResourceCreator")
   uploadedMedia    MediaAsset[]
   quizAttempts     QuizAttempt[]
+  updatedIntegrations Integration[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -482,6 +483,11 @@ enum PaymentStatus {
   FAILED
 }
 
+enum PaymentProvider {
+  STRIPE
+  PAYSTACK
+}
+
 model Enrollment {
   id       String           @id @default(cuid())
   userId   String
@@ -489,8 +495,10 @@ model Enrollment {
   cohortId String?
   status   EnrollmentStatus @default(ACTIVE)
 
-  paymentStatus           PaymentStatus @default(NONE)
-  stripeCheckoutSessionId String?       @unique
+  paymentStatus           PaymentStatus    @default(NONE)
+  paymentProvider         PaymentProvider?
+  stripeCheckoutSessionId String?          @unique
+  paystackReference       String?          @unique
 
   enrolledAt  DateTime  @default(now())
   completedAt DateTime?
@@ -862,8 +870,10 @@ model Transaction {
   type                    GivingType
   designation             String?
   status                  TransactionStatus  @default(PENDING)
+  provider                PaymentProvider    @default(STRIPE)
   stripePaymentIntentId   String?            @unique
   stripeCheckoutSessionId String?            @unique
+  paystackReference       String?            @unique
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -889,4 +899,29 @@ model Announcement {
   createdAt DateTime @default(now())
 
   @@index([cohortId])
+}
+
+enum IntegrationType {
+  EMAIL
+  PAYMENTS
+  AI
+  SMS
+}
+
+/** SUPER_ADMIN-only, runtime-editable third-party credentials (email, payments, AI, SMS). Secrets are encrypted at rest — see lib/crypto.ts. */
+model Integration {
+  id               String          @id @default(cuid())
+  type             IntegrationType
+  provider         String
+  enabled          Boolean         @default(false)
+  config           Json            @default("{}")
+  secretsEncrypted String?
+
+  updatedById String?
+  updatedBy   User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, provider])
 }

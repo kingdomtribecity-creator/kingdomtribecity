@@ -34,6 +34,11 @@ export async function requireAdmin() {
   return requireRole("ADMIN", "SUPER_ADMIN");
 }
 
+/** Platform credentials (email/payments/AI/SMS provider keys) — deliberately not delegable via the permission system. */
+export async function requireSuperAdmin() {
+  return requireRole("SUPER_ADMIN");
+}
+
 export async function requireMentorOrAdmin() {
   return requireRole("MENTOR", "ADMIN", "SUPER_ADMIN");
 }

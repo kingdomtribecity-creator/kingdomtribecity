@@ -12,7 +12,7 @@ Read the founding docs first:
 
 ## Stack
 
-Next.js 16 (App Router) · TypeScript · Tailwind v4 + shadcn/ui (Radix) · Prisma 7 + PostgreSQL · Auth.js v5 · Stripe · Cloudflare R2
+Next.js 16 (App Router) · TypeScript · Tailwind v4 + shadcn/ui (Radix) · Prisma 7 + PostgreSQL · Auth.js v5 · Stripe + Paystack · Cloudflare R2
 
 ## Getting started
 
@@ -49,6 +49,8 @@ Seeded by `prisma/seed.ts`, password `KingdomDemo!23` for all:
 ### Environment variables
 
 See `.env` for the full list. `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` and `R2_*` are optional in development — the `/give` flow and media uploads degrade gracefully with a clear message when they aren't configured.
+
+`INTEGRATIONS_ENCRYPTION_KEY` (required to use `/admin/settings/integrations`) encrypts email/payments/AI/SMS provider keys stored in the database — generate one with `openssl rand -hex 32`. Unlike Stripe/R2, these integrations (Resend, Gmail, Paystack, Anthropic, OpenAI, Termii) are configured **at runtime** by a Super Admin from `/admin/settings/integrations`, not via `.env` — no redeploy needed to add or rotate a key.
 
 ## Scripts
 
