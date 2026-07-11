@@ -12,6 +12,13 @@ export async function signOutAction() {
   await signOut({ redirectTo: "/" });
 }
 
+export async function signInWithGoogleAction(callbackUrl: string) {
+  // Works for both first-time (sign-up) and returning users — proxy.ts
+  // already redirects anyone without onboardedAt set to /onboarding,
+  // so a plain /dashboard target is correct either way.
+  await signIn("google", { redirectTo: callbackUrl });
+}
+
 export async function signUpAction(
   _prevState: AuthActionState,
   formData: FormData

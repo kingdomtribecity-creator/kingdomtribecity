@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SignUpForm } from "@/components/auth/sign-up-form";
+import { googleConfigured } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Start Your Journey" };
 
@@ -12,7 +13,7 @@ export default function SignUpPage() {
           Create your account to be planted, rooted, formed, and sent.
         </p>
       </div>
-      <SignUpForm />
+      <SignUpForm googleConfigured={googleConfigured} />
     </div>
   );
 }

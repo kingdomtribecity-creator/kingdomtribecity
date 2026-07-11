@@ -52,6 +52,8 @@ See `.env` for the full list. `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` and 
 
 `INTEGRATIONS_ENCRYPTION_KEY` (required to use `/admin/settings/integrations`) encrypts email/payments/AI/SMS provider keys stored in the database — generate one with `openssl rand -hex 32`. Unlike Stripe/R2, these integrations (Resend, Gmail, Paystack, Anthropic, OpenAI, Termii) are configured **at runtime** by a Super Admin from `/admin/settings/integrations`, not via `.env` — no redeploy needed to add or rotate a key.
 
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional) enable "Continue with Google" on `/sign-in` and `/sign-up` — from a Google Cloud Console OAuth 2.0 Client (Web application), with authorized redirect URIs `http://localhost:3000/api/auth/callback/google` (dev) and `https://<your-domain>/api/auth/callback/google` (prod). Without these set, the app runs fine with Credentials-only sign-in — the Google button simply doesn't render.
+
 ## Scripts
 
 - `npm run dev` — start the dev server (Turbopack)

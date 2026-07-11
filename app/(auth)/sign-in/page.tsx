@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SignInForm } from "@/components/auth/sign-in-form";
+import { googleConfigured } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -18,12 +19,7 @@ export default async function SignInPage({
           Sign in to continue your journey.
         </p>
       </div>
-      <SignInForm callbackUrl={callbackUrl} />
-      <div className="rounded-lg border border-dashed border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
-        <p className="font-medium text-foreground">Demo access</p>
-        <p className="mt-1">student@kingdomtribecity.org · admin@kingdomtribecity.org</p>
-        <p>Password: KingdomDemo!23</p>
-      </div>
+      <SignInForm callbackUrl={callbackUrl} googleConfigured={googleConfigured} />
     </div>
   );
 }

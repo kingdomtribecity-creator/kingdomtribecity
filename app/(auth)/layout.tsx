@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import { BRAND_GRADIENT } from "@/lib/gradients";
+import { PHOTOGRAPHY } from "@/lib/photography";
 
 export default function AuthLayout({
   children,
@@ -14,14 +16,19 @@ export default function AuthLayout({
         </Link>
         <div className="mx-auto w-full max-w-sm">{children}</div>
       </div>
-      <div
-        className="hidden flex-col justify-end p-12 text-white lg:flex"
-        style={{ backgroundImage: BRAND_GRADIENT }}
-      >
-        <blockquote className="font-heading text-3xl leading-snug">
+      <div className="relative hidden flex-col justify-end overflow-hidden p-12 text-white lg:flex">
+        <Image
+          src={PHOTOGRAPHY.community}
+          alt=""
+          fill
+          sizes="50vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0" style={{ backgroundImage: BRAND_GRADIENT, opacity: 0.82 }} />
+        <blockquote className="relative font-heading text-3xl leading-snug">
           &ldquo;Before you build externally, God builds internally.&rdquo;
         </blockquote>
-        <p className="mt-4 max-w-md text-white/80">
+        <p className="relative mt-4 max-w-md text-white/80">
           Planted, rooted, formed, fruitful, sent — the pathway to becoming a
           Kingdom Ambassador starts here.
         </p>
