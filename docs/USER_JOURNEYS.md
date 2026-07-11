@@ -7,7 +7,7 @@
 3. Clicks primary CTA "Start Your Journey" → `/sign-up`.
 4. Creates account (email/password or magic link) → `/onboarding`.
 5. Onboarding: name, sphere of influence, what brought you here → account created with `stage = PLANTED`.
-6. Auto-enrolled in the first Planted & Rooted course; assigned to an open Tribe within the active Cohort.
+6. Auto-enrolled in the flagship Rooted and Built course; assigned to an open Tribe within its active Cohort.
 7. Redirected to `/dashboard` — sees Stage badge (Planted), a "Begin your first lesson" prompt.
 
 ## 2. Active student — the core loop
@@ -16,7 +16,7 @@
 2. Clicks into `/learn/[courseSlug]/[lessonSlug]`.
 3. Moves through the lesson stepper: Teaching → Scripture Meditation → Reflection (answers guided prompts) → Assignment → Journal entry.
 4. On completion, `LessonProgress` is marked complete, streak recalculated, dashboard stage/track status updates.
-5. When all lessons in the stage's course(s) are complete, the stage advances (e.g. Planted → Rooted) with a celebratory moment.
+5. When all lessons in a stage-tagged module are complete, the stage advances (e.g. Planted → Rooted) with a celebratory moment; when all lessons in the whole course are complete, the enrollment finishes and a certificate is issued (if the course offers one).
 6. Repeats daily/weekly — streak and dashboard reinforce consistency.
 
 ## 3. Community member
@@ -34,7 +34,8 @@
 ## 5. Admin
 
 1. Signs in → `/admin`.
-2. Manages Users (role changes, stage overrides), Courses/Modules/Lessons (CRUD), Cohorts/Tribes/Mentors, Announcements.
+2. Manages Users (role changes, stage overrides), Programs (create a new "Expression" without touching code), Courses/Modules/Lessons/Quizzes (CRUD), course-scoped Cohorts/Tribes/Mentors, Announcements.
+3. Creates a brand-new course from `/admin/courses`: name, description, banner, category, difficulty, duration, dates, format, access level, pricing, instructor, mentors, certificate — then adds modules and lessons, optionally tagging modules with a Stage so the course contributes to the universal growth pathway.
 3. Views Analytics overview: active members, completion rates, stage distribution, event attendance.
 
 ## 6. Partner (giving)

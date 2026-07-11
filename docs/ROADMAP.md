@@ -4,9 +4,9 @@
 
 - Public marketing site (all sections from the PRD), now with curated photography (`lib/photography.ts`)
 - Auth: sign-up, sign-in, onboarding
-- Planted & Rooted LMS: 3 courses (Planted, Rooted, Formed) with modules/lessons, full Teaching → Scripture → Reflection → Assignment → Journal flow, progress tracking, certificate on course completion
+- Planted & Rooted LMS (superseded in Phase 3 by Rooted and Built, see below): 3 courses (Planted, Rooted, Formed) with modules/lessons, full Teaching → Scripture → Reflection → Assignment → Journal flow, progress tracking, certificate on course completion
 - Personal Growth Dashboard: stage pathway, per-track status, streak, continue-learning, journal
-- Community: one Cohort ("Planted and Rooted Cohort One") with three Tribes (Deborah, Daniel, Esther) — discussion feed, prayer requests, mentor view
+- Community: one Cohort ("Planted and Rooted Cohort One", renamed in Phase 3) with three Tribes (Deborah, Daniel, Esther) — discussion feed, prayer requests, mentor view
 - Admin dashboard: Users, Courses/Modules/Lessons CRUD, Cohorts/Tribes/Mentors, Announcements, analytics overview
 
 ## Phase 2 — RBAC, content engine & storage foundation (deep)
@@ -16,6 +16,16 @@
 - **Expanded content model**: `Resource` now covers the full taxonomy (video/audio/sermon/PDF/ebook/document/study/workbook/devotional/article/external link/YouTube/event recording/live replay/image/teaching notes), with tags, visibility tiers, speaker/program connections, and related-resources — full CRUD at `/admin/resources`, built end-to-end through the R2 pipeline.
 - **Instructor role wired into the existing admin**: reuses the admin course editor (no parallel UI), scoped to courses/resources the instructor authored (`Course.authorId`, `Resource.createdById`).
 - **Curated photography**: real, hand-picked Unsplash imagery on the homepage, `/programs`, and course heroes, replaceable with R2-hosted originals with no code change (`lib/photography.ts`).
+
+## Phase 3 — Dynamic course engine, paid courses & quizzes (deep)
+
+- **Dynamic Course Engine**: `Program.slug` is a plain string (not an enum), so admins create unlimited programs, courses, modules, and lessons from `/admin/programs` and `/admin/courses` with no code changes or migrations. Course builder covers category, difficulty, duration, start/end dates, format (self-paced/cohort-based/challenge/intensive/certification), access level, pricing, instructor, mentors, and certificate eligibility. Course status moves through Draft → Review → Published → Archived.
+- **Rooted and Built**: the flagship course renamed from Planted & Rooted and restructured from 3 separate courses into 1 course with 4 modules — Identity (Planted), Relationship with God (Rooted), Formation (Formed), Kingdom Assignment (Fruitful) — proving the universal Planted → Rooted → Formed → Fruitful → Sent pathway is driven by `Module.stage`, not by any single course.
+- **Course-scoped cohorts**: `Cohort.courseId` is required — any course can run multiple cohorts, each with its own timeline, mentors/tribes, and status (Upcoming/Active/Completed). `/admin/cohorts` is now a cross-course index; cohorts are created from a course's own edit page.
+- **Reusable content library**: `LessonResource` lets one uploaded `Resource` attach to lessons across many courses without re-uploading.
+- **Quizzes**: per-lesson quiz builder (admin) and a graded quiz step in the student lesson stepper — grading and correct answers stay server-side only.
+- **Paid courses**: Stripe Checkout extended beyond giving to course purchases (`Enrollment.paymentStatus`), gating lesson access until payment clears.
+- A second seeded course (`Kingdom Leaders Intensive`, authored by the demo Instructor) demonstrates multi-program dynamism, instructor scoping, and paid pricing together.
 
 ## Scaffolded (schema-complete, minimal UI — extend when prioritized)
 
@@ -42,7 +52,7 @@
 ## Suggested next milestones
 
 1. Assignment submission model + mentor/instructor review UI (unlocks two deferred items at once).
-2. Build out one full "Expression" (start with Young & Yielded — highest community-building upside) to the same depth as Planted & Rooted.
+2. Build out one full "Expression" (start with Young & Yielded — highest community-building upside) to the same depth as Rooted and Built.
 3. Recurring giving + designation picker in the `/give` flow.
 4. Dedicated Mentor dashboard: cross-Tribe view, reports, lightweight messaging.
 5. Testimony submission + moderation queue in Admin.

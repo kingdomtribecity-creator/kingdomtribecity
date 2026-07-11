@@ -12,12 +12,14 @@ import {
   Library,
   FolderOpen,
   ShieldCheck,
+  Layers,
 } from "lucide-react";
 import type { Role } from "@/lib/generated/prisma/enums";
 
 const LINKS: { href: string; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER"] },
   { href: "/admin/users", label: "Users", icon: Users, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { href: "/admin/programs", label: "Programs", icon: Layers, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER"] },
   { href: "/admin/courses", label: "Courses", icon: BookOpen, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER", "INSTRUCTOR"] },
   { href: "/admin/resources", label: "Resources", icon: Library, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER", "INSTRUCTOR"] },
   { href: "/admin/media", label: "Media", icon: FolderOpen, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER", "INSTRUCTOR"] },

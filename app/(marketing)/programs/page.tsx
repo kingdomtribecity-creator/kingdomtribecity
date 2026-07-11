@@ -4,20 +4,14 @@ import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { PROGRAM_PHOTO } from "@/lib/photography";
+import { PROGRAM_PHOTO, PHOTOGRAPHY } from "@/lib/photography";
 
 export const metadata: Metadata = { title: "Programs" };
 
-const PROGRAM_HREF: Record<string, string> = {
-  PLANTED_AND_ROOTED: "/sign-up",
-  YOUNG_AND_YIELDED: "/expressions/young-and-yielded",
-  KINGDOM_WARRIOR_WOMAN: "/expressions/kingdom-warrior-woman",
-  KINGDOM_LEADERS: "/expressions/kingdom-leaders",
-};
-
 export default async function ProgramsPage() {
   const programs = await prisma.program.findMany({
-    include: { courses: { where: { published: true } } },
+    where: { published: true },
+    include: { courses: { where: { status: "PUBLISHED" } } },
     orderBy: { name: "asc" },
   });
 
@@ -32,7 +26,9 @@ export default async function ProgramsPage() {
         </h1>
         <p className="mt-4 text-muted-foreground">
           Every KTC program walks the same Planted → Rooted → Formed →
-          Fruitful → Sent pathway, expressed for a specific community.
+          Fruitful → Sent pathway, expressed for a specific community —
+          new programs are added from the admin dashboard, not a code
+          release.
         </p>
       </div>
 
@@ -41,7 +37,7 @@ export default async function ProgramsPage() {
           <Card key={program.id} className="overflow-hidden border-border/60 py-0">
             <div className="relative h-40">
               <Image
-                src={PROGRAM_PHOTO[program.slug] ?? PROGRAM_PHOTO.PLANTED_AND_ROOTED}
+                src={program.heroImage || PROGRAM_PHOTO[program.slug] || PHOTOGRAPHY.community}
                 alt=""
                 fill
                 sizes="(min-width: 640px) 50vw, 100vw"
@@ -58,7 +54,7 @@ export default async function ProgramsPage() {
                 </p>
               )}
               <Button className="mt-5" variant="outline" asChild>
-                <Link href={PROGRAM_HREF[program.slug] ?? "/sign-up"}>Explore</Link>
+                <Link href={`/expressions/${program.slug}`}>Explore</Link>
               </Button>
             </CardContent>
           </Card>

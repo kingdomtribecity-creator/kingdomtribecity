@@ -3,34 +3,28 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { createCourseAction } from "@/lib/actions/admin";
 import { requirePermission } from "@/lib/rbac";
 import { PERMISSIONS } from "@/lib/permissions";
-import { STAGE_ORDER, STAGE_META } from "@/lib/stage";
+import { r2Configured } from "@/lib/r2";
+import { createCourseAction } from "@/lib/actions/admin";
+import { CourseForm } from "@/components/admin/course-form";
 
 export const metadata: Metadata = { title: "Courses" };
 
 export default async function AdminCoursesPage() {
   const user = await requirePermission(PERMISSIONS.CONTENT_MANAGE);
 
-  const [courses, programs] = await Promise.all([
+  const [courses, programs, people] = await Promise.all([
     prisma.course.findMany({
       where: user.role === "INSTRUCTOR" ? { authorId: user.id } : {},
       orderBy: { order: "asc" },
       include: { program: true, modules: { include: { lessons: true } } },
     }),
     prisma.program.findMany({ orderBy: { name: "asc" } }),
+    prisma.user.findMany({
+      where: { role: { in: ["INSTRUCTOR", "MENTOR", "MINISTRY_LEADER", "ADMIN", "SUPER_ADMIN"] } },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   return (
@@ -54,70 +48,32 @@ export default async function AdminCoursesPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{STAGE_META[course.stage].label}</Badge>
-                    {!course.published && <Badge variant="outline">Draft</Badge>}
+                    <Badge variant="secondary">{course.status}</Badge>
+                    {course.pricingType === "PAID" && <Badge variant="outline">Paid</Badge>}
                   </div>
                 </CardContent>
               </Card>
             </Link>
           );
         })}
+        {courses.length === 0 && (
+          <p className="text-sm text-muted-foreground">No courses yet — create the first one below.</p>
+        )}
       </div>
 
       <Card className="border-dashed border-border">
         <CardContent className="p-6">
           <p className="font-medium">New course</p>
-          <form action={createCourseAction} className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="title">Title</Label>
-              <Input id="title" name="title" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="slug">Slug</Label>
-              <Input id="slug" name="slug" required placeholder="e.g. fruitful-purpose" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="programId">Program</Label>
-              <Select name="programId" required>
-                <SelectTrigger id="programId" className="w-full">
-                  <SelectValue placeholder="Select a program" />
-                </SelectTrigger>
-                <SelectContent>
-                  {programs.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="stage">Stage</Label>
-              <Select name="stage" required>
-                <SelectTrigger id="stage" className="w-full">
-                  <SelectValue placeholder="Select a stage" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STAGE_ORDER.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {STAGE_META[s].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="subtitle">Subtitle</Label>
-              <Input id="subtitle" name="subtitle" />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" name="description" rows={3} required />
-            </div>
-            <Button type="submit" className="sm:col-span-2 sm:w-fit">
-              Create course
-            </Button>
-          </form>
+          <div className="mt-4">
+            <CourseForm
+              action={createCourseAction}
+              mode="create"
+              programs={programs}
+              people={people.map((p) => ({ id: p.id, name: p.name ?? p.email }))}
+              canReassignAuthor={user.role !== "INSTRUCTOR"}
+              storageConfigured={r2Configured}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>

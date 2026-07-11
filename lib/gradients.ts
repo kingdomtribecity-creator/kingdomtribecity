@@ -20,6 +20,6 @@ export const STAGE_GRADIENT: Record<Stage, string> = {
 export const BRAND_GRADIENT =
   "linear-gradient(135deg, oklch(0.58 0.14 82) 0%, oklch(0.3 0.07 230) 55%, oklch(0.2 0.03 260) 100%)";
 
-export function stageGradient(stage: Stage): string {
-  return STAGE_GRADIENT[stage];
+export function stageGradient(stage: Stage | null | undefined): string {
+  return stage ? STAGE_GRADIENT[stage] : BRAND_GRADIENT;
 }

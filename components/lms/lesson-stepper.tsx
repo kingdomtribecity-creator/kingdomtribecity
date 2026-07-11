@@ -9,13 +9,14 @@ import {
   submitReflectionAction,
   submitAssignmentAction,
   submitJournalAction,
+  submitQuizAttemptAction,
 } from "@/lib/actions/lms";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Sparkles, XCircle } from "lucide-react";
 
 type Lesson = {
   id: string;
@@ -26,9 +27,17 @@ type Lesson = {
   scriptureRefs: string[];
   scriptureText: string | null;
   reflectionQuestions: string[];
+  prayerPrompt?: string | null;
   assignmentPrompt: string | null;
   journalPrompt: string | null;
 };
+
+type QuizData = {
+  id: string;
+  title: string;
+  passScorePercent: number;
+  questions: { id: string; prompt: string; options: { id: string; label: string }[] }[];
+} | null;
 
 type ProgressState = {
   teachingViewedAt: Date | null;
@@ -37,20 +46,22 @@ type ProgressState = {
   journalDoneAt: Date | null;
 } | null;
 
-const STEPS = ["teaching", "scripture", "reflect", "assignment", "journal"] as const;
-type Step = (typeof STEPS)[number];
+const ALL_STEPS = ["teaching", "scripture", "reflect", "quiz", "assignment", "journal"] as const;
+type Step = (typeof ALL_STEPS)[number];
 
 const STEP_LABEL: Record<Step, string> = {
   teaching: "Teaching",
   scripture: "Scripture",
   reflect: "Reflection",
+  quiz: "Quiz",
   assignment: "Assignment",
   journal: "Journal",
 };
 
-function initialStep(progress: ProgressState): Step {
+function initialStep(progress: ProgressState, hasQuiz: boolean): Step {
   if (!progress?.teachingViewedAt) return "teaching";
   if (!progress?.reflectionDoneAt) return "reflect";
+  if (hasQuiz && !progress?.assignmentDoneAt) return "quiz";
   if (!progress?.assignmentDoneAt) return "assignment";
   if (!progress?.journalDoneAt) return "journal";
   return "journal";
@@ -58,29 +69,35 @@ function initialStep(progress: ProgressState): Step {
 
 export function LessonStepper({
   lesson,
+  quiz,
   progress,
   initialAnswers,
   nextLessonHref,
   courseHref,
 }: {
   lesson: Lesson;
+  quiz?: QuizData;
   progress: ProgressState;
   initialAnswers: Record<string, string> | null;
   nextLessonHref: string | null;
   courseHref: string;
 }) {
+  const steps = useMemo(
+    () => ALL_STEPS.filter((s) => s !== "quiz" || Boolean(quiz)),
+    [quiz]
+  );
   const isComplete = Boolean(progress?.journalDoneAt);
-  const [step, setStep] = useState<Step>(initialStep(progress));
+  const [step, setStep] = useState<Step>(initialStep(progress, Boolean(quiz)));
   const [celebrating, setCelebrating] = useState(false);
   const { update } = useSession();
   const router = useRouter();
 
-  const stepIndex = STEPS.indexOf(step);
+  const stepIndex = steps.indexOf(step);
 
   return (
     <div>
       <ol className="flex items-center gap-2">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <li key={s} className="flex items-center gap-2">
             <button
               type="button"
@@ -98,7 +115,7 @@ export function LessonStepper({
             >
               {i < stepIndex ? <CheckCircle2 className="size-4" /> : i + 1}
             </button>
-            {i < STEPS.length - 1 && <div className="h-px w-6 bg-border sm:w-10" />}
+            {i < steps.length - 1 && <div className="h-px w-6 bg-border sm:w-10" />}
           </li>
         ))}
       </ol>
@@ -131,8 +148,11 @@ export function LessonStepper({
               <ReflectStep
                 lesson={lesson}
                 initialAnswers={initialAnswers}
-                onDone={() => setStep("assignment")}
+                onDone={() => setStep(quiz ? "quiz" : "assignment")}
               />
+            )}
+            {step === "quiz" && quiz && (
+              <QuizStep quiz={quiz} onDone={() => setStep("assignment")} />
             )}
             {step === "assignment" && (
               <AssignmentStep lesson={lesson} onDone={() => setStep("journal")} />
@@ -285,9 +305,82 @@ function ReflectStep({
           />
         </div>
       ))}
+      {lesson.prayerPrompt && (
+        <div className="rounded-lg border-l-4 border-growth bg-growth/5 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-growth">
+            Prayer exercise
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{lesson.prayerPrompt}</p>
+        </div>
+      )}
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
       <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Continue to Assignment"}
+        {pending ? "Saving…" : "Continue"}
+      </Button>
+    </form>
+  );
+}
+
+function QuizStep({
+  quiz,
+  onDone,
+}: {
+  quiz: NonNullable<QuizData>;
+  onDone: () => void;
+}) {
+  const boundAction = useMemo(() => submitQuizAttemptAction.bind(null, quiz.id), [quiz.id]);
+  const [state, formAction, pending] = useActionState(boundAction, undefined);
+
+  if (state?.success) {
+    return (
+      <div className="space-y-4">
+        <p
+          className={cn(
+            "flex items-center gap-2 text-sm font-medium",
+            state.passed ? "text-growth" : "text-destructive"
+          )}
+        >
+          {state.passed ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}
+          {state.passed ? "You passed!" : "Not quite — you can continue and revisit this later."}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Score: {state.scorePercent}% (passing score: {quiz.passScorePercent}%)
+        </p>
+        <Button onClick={onDone}>Continue to Assignment</Button>
+      </div>
+    );
+  }
+
+  return (
+    <form action={formAction} className="space-y-6">
+      <p className="font-heading text-lg font-medium">{quiz.title}</p>
+      {quiz.questions.map((q, qi) => (
+        <div key={q.id} className="space-y-2">
+          <Label>
+            {qi + 1}. {q.prompt}
+          </Label>
+          <div className="space-y-1.5">
+            {q.options.map((opt) => (
+              <label
+                key={opt.id}
+                className="flex items-center gap-2 rounded-md border border-input p-2.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+              >
+                <input
+                  type="radio"
+                  name={`question_${q.id}`}
+                  value={opt.id}
+                  required
+                  className="accent-primary"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+      {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+      <Button type="submit" disabled={pending}>
+        {pending ? "Grading…" : "Submit quiz"}
       </Button>
     </form>
   );

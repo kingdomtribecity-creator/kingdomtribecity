@@ -3,6 +3,7 @@
 import { requireUser } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { onboardingSchema } from "@/lib/validations";
+import { FLAGSHIP_PROGRAM_SLUG } from "@/lib/constants";
 
 export type OnboardingActionState = { error?: string; success?: boolean } | undefined;
 
@@ -29,35 +30,44 @@ export async function completeOnboardingAction(
     },
   });
 
-  const firstCourse = await prisma.course.findFirst({
-    where: { stage: "PLANTED", published: true },
-    orderBy: { order: "asc" },
+  // New members are onboarded into the flagship program's first published
+  // course and its active cohort — the one deliberate default in an
+  // otherwise fully dynamic, admin-created program catalog.
+  const activeCohort = await prisma.cohort.findFirst({
+    where: { status: "ACTIVE", course: { program: { slug: FLAGSHIP_PROGRAM_SLUG } } },
+    orderBy: { startDate: "desc" },
+    include: { course: true, tribes: { include: { _count: { select: { members: true } } } } },
   });
+
+  const firstCourse =
+    activeCohort?.course ??
+    (await prisma.course.findFirst({
+      where: { status: "PUBLISHED", program: { slug: FLAGSHIP_PROGRAM_SLUG } },
+      orderBy: { order: "asc" },
+    }));
+
   if (firstCourse) {
     await prisma.enrollment.upsert({
       where: { userId_courseId: { userId: user.id, courseId: firstCourse.id } },
       update: {},
-      create: { userId: user.id, courseId: firstCourse.id },
+      create: {
+        userId: user.id,
+        courseId: firstCourse.id,
+        cohortId: activeCohort?.id,
+      },
     });
   }
 
   const alreadyInTribe = await prisma.tribeMembership.findFirst({
     where: { userId: user.id },
   });
-  if (!alreadyInTribe) {
-    const activeCohort = await prisma.cohort.findFirst({
-      where: { active: true },
-      orderBy: { startDate: "desc" },
-      include: { tribes: { include: { _count: { select: { members: true } } } } },
+  if (!alreadyInTribe && activeCohort && activeCohort.tribes.length > 0) {
+    const smallestTribe = [...activeCohort.tribes].sort(
+      (a, b) => a._count.members - b._count.members
+    )[0];
+    await prisma.tribeMembership.create({
+      data: { userId: user.id, tribeId: smallestTribe.id },
     });
-    if (activeCohort && activeCohort.tribes.length > 0) {
-      const smallestTribe = [...activeCohort.tribes].sort(
-        (a, b) => a._count.members - b._count.members
-      )[0];
-      await prisma.tribeMembership.create({
-        data: { userId: user.id, tribeId: smallestTribe.id },
-      });
-    }
   }
 
   return { success: true };

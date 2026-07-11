@@ -25,14 +25,22 @@ export async function POST(req: Request) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    await prisma.transaction.updateMany({
-      where: { stripeCheckoutSessionId: session.id },
-      data: {
-        status: "SUCCEEDED",
-        stripePaymentIntentId:
-          typeof session.payment_intent === "string" ? session.payment_intent : undefined,
-      },
-    });
+
+    if (session.metadata?.kind === "course_purchase") {
+      await prisma.enrollment.updateMany({
+        where: { stripeCheckoutSessionId: session.id },
+        data: { paymentStatus: "PAID", status: "ACTIVE" },
+      });
+    } else {
+      await prisma.transaction.updateMany({
+        where: { stripeCheckoutSessionId: session.id },
+        data: {
+          status: "SUCCEEDED",
+          stripePaymentIntentId:
+            typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+        },
+      });
+    }
   }
 
   return NextResponse.json({ received: true });

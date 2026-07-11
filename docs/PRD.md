@@ -41,14 +41,14 @@ Nothing ships that would look out of place next to these products.
 ## 4. Ecosystem Modules
 
 1. **Public website** — storytelling: Vision, Story, Programs, Events, Testimonies, Community, Resources, Partnership.
-2. **Planted & Rooted LMS** — flagship discipleship school (built deep this phase).
+2. **Dynamic Course Engine** — a general-purpose LMS: admins create unlimited programs, courses, modules, and cohorts from the dashboard with no code changes. **Rooted and Built** is the flagship discipleship school (Identity → Relationship with God → Formation → Kingdom Assignment) — one course among many the engine can host, not something baked into the application.
 3. **Personal Growth Dashboard** — the user's spiritual home screen.
-4. **Community** — Cohorts → Tribes, mentors, discussion, prayer requests, testimonies.
-5. **KTC Expressions** — Planted & Rooted, Young & Yielded (youth), Kingdom Warrior Woman (women), Kingdom Leaders (leadership development).
+4. **Community** — Cohorts (course-scoped) → Tribes, mentors, discussion, prayer requests, testimonies.
+5. **KTC Expressions** — Rooted and Built, Young & Yielded (youth), Kingdom Warrior Woman (women), Kingdom Leaders (leadership development) — each an ordinary `Program` row, not a hardcoded route.
 6. **Events** — registration, speakers, recordings.
-7. **Resource Library** — teachings, sermons, articles, studies, devotionals by category.
-8. **Giving & Partnership** — one-time and recurring giving via Stripe.
-9. **Admin/Leadership Dashboard** — users, courses, cohorts, mentors, announcements, analytics.
+7. **Resource Library** — teachings, sermons, articles, studies, devotionals by category; reusable across any course via lesson↔resource attachments.
+8. **Giving & Partnership** — one-time and recurring giving via Stripe, plus paid-course checkout using the same Stripe integration.
+9. **Admin/Leadership Dashboard** — users, programs, courses, modules, lessons, quizzes, cohorts, mentors, announcements, analytics.
 
 ## 5. The Lesson Experience (key differentiator)
 
@@ -61,10 +61,12 @@ Teaching (video/audio)
     ↓
 Scripture Meditation
     ↓
-Reflection — guided prompts:
+Reflection — guided prompts + optional prayer exercise:
     "What is God revealing?"
     "What mindset is changing?"
     "What truth am I embracing?"
+    ↓
+Quiz (optional, per lesson)
     ↓
 Assignment
     ↓
@@ -73,7 +75,7 @@ Spiritual Journal entry
 Growth tracking updates
 ```
 
-Every lesson produces a written artifact (reflection + journal) the student can revisit — the product remembers their formation, not just their completion.
+Every lesson produces a written artifact (reflection + journal) the student can revisit — the product remembers their formation, not just their completion. Lessons may also attach reusable resources from the shared content library (video/audio/PDF/ebook/external links/downloadables) so one upload can serve many courses.
 
 ## 6. Personal Growth Dashboard
 

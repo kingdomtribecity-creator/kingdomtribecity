@@ -16,6 +16,45 @@ export async function enrollInCourseAction(courseId: string) {
   revalidatePath("/learn");
 }
 
+export type QuizActionState =
+  | { error?: string; success?: boolean; scorePercent?: number; passed?: boolean }
+  | undefined;
+
+/** Grades server-side only — correct answers are never sent to the client. */
+export async function submitQuizAttemptAction(
+  quizId: string,
+  _prevState: QuizActionState,
+  formData: FormData
+): Promise<QuizActionState> {
+  const user = await requireUser();
+
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    include: { questions: { include: { options: true } } },
+  });
+  if (!quiz) return { error: "Quiz not found." };
+
+  let correctCount = 0;
+  const answers: Record<string, string> = {};
+  for (const question of quiz.questions) {
+    const selectedOptionId = String(formData.get(`question_${question.id}`) ?? "");
+    answers[question.id] = selectedOptionId;
+    if (question.options.find((o) => o.id === selectedOptionId)?.isCorrect) {
+      correctCount += 1;
+    }
+  }
+
+  const scorePercent =
+    quiz.questions.length > 0 ? Math.round((correctCount / quiz.questions.length) * 100) : 0;
+  const passed = scorePercent >= quiz.passScorePercent;
+
+  await prisma.quizAttempt.create({
+    data: { quizId, userId: user.id, scorePercent, passed, answers },
+  });
+
+  return { success: true, scorePercent, passed };
+}
+
 export async function recordTeachingViewedAction(lessonId: string) {
   const user = await requireUser();
   await prisma.lessonProgress.upsert({
@@ -135,51 +174,62 @@ export async function submitJournalAction(
   return { success: true, stageAdvanced };
 }
 
-/** After a lesson completes: checks course completion (+ certificate) and stage advancement. */
+/**
+ * After a lesson completes: checks module completion (drives stage
+ * advancement — a Module, not a whole Course, is what forms a stage) and
+ * course completion (drives Enrollment completion + certificate issuance).
+ */
 async function maybeAdvanceProgress(userId: string, lessonId: string): Promise<boolean> {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    include: { module: { include: { course: { include: { modules: { include: { lessons: true } } } } } } },
+    include: {
+      module: {
+        include: {
+          lessons: true,
+          course: { include: { modules: { include: { lessons: true } } } },
+        },
+      },
+    },
   });
   if (!lesson) return false;
 
-  const course = lesson.module.course;
-  const allLessonIds = course.modules.flatMap((m) => m.lessons.map((l) => l.id));
+  const mod = lesson.module;
+  const course = mod.course;
 
-  const completedCount = await prisma.lessonProgress.count({
+  let stageAdvanced = false;
+  const moduleLessonIds = mod.lessons.map((l) => l.id);
+  const moduleCompletedCount = await prisma.lessonProgress.count({
+    where: { userId, lessonId: { in: moduleLessonIds }, status: "COMPLETED" },
+  });
+
+  if (moduleLessonIds.length > 0 && moduleCompletedCount >= moduleLessonIds.length && mod.stage) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const next = user && user.stage === mod.stage ? nextStage(mod.stage) : null;
+    if (next) {
+      await prisma.user.update({ where: { id: userId }, data: { stage: next } });
+      stageAdvanced = true;
+    }
+  }
+
+  const allLessonIds = course.modules.flatMap((m) => m.lessons.map((l) => l.id));
+  const courseCompletedCount = await prisma.lessonProgress.count({
     where: { userId, lessonId: { in: allLessonIds }, status: "COMPLETED" },
   });
 
-  if (completedCount < allLessonIds.length) return false;
+  if (allLessonIds.length > 0 && courseCompletedCount >= allLessonIds.length) {
+    await prisma.enrollment.updateMany({
+      where: { userId, courseId: course.id },
+      data: { status: "COMPLETED", completedAt: new Date() },
+    });
 
-  await prisma.enrollment.updateMany({
-    where: { userId, courseId: course.id },
-    data: { status: "COMPLETED", completedAt: new Date() },
-  });
+    if (course.certificateEnabled) {
+      await prisma.certificate.upsert({
+        where: { userId_courseId: { userId, courseId: course.id } },
+        update: {},
+        create: { userId, courseId: course.id },
+      });
+    }
+  }
 
-  await prisma.certificate.upsert({
-    where: { userId_courseId: { userId, courseId: course.id } },
-    update: {},
-    create: { userId, courseId: course.id },
-  });
-
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user || user.stage !== course.stage) return false;
-
-  const stageCourses = await prisma.course.findMany({
-    where: { stage: course.stage, published: true },
-  });
-  const stageCourseIds = stageCourses.map((c) => c.id);
-
-  const completedStageCourses = await prisma.enrollment.count({
-    where: { userId, courseId: { in: stageCourseIds }, status: "COMPLETED" },
-  });
-
-  if (completedStageCourses < stageCourseIds.length) return false;
-
-  const next = nextStage(course.stage);
-  if (!next) return false;
-
-  await prisma.user.update({ where: { id: userId }, data: { stage: next } });
-  return true;
+  return stageAdvanced;
 }

@@ -42,7 +42,7 @@ Seeded by `prisma/seed.ts`, password `KingdomDemo!23` for all:
 | `superadmin@kingdomtribecity.org` | Super Administrator |
 | `admin@kingdomtribecity.org` | Administrator |
 | `leader@kingdomtribecity.org` | Ministry Leader |
-| `instructor@kingdomtribecity.org` | Instructor (owns the "Formed" course) |
+| `instructor@kingdomtribecity.org` | Instructor (owns the "Kingdom Leaders Intensive" paid course) |
 | `mentor.deborah@kingdomtribecity.org` | Mentor (Tribe Deborah) |
 | `student@kingdomtribecity.org` | Student (mid-course, in Tribe Deborah) |
 

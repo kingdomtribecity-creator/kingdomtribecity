@@ -7,7 +7,7 @@
 - **Prisma ORM 7** + **PostgreSQL** (hosted on Neon). Prisma 7 requires a driver adapter for runtime queries — see `lib/prisma.ts`, which uses `@prisma/adapter-pg`. CLI/migrate connection config lives in `prisma.config.ts`.
 - **Auth.js v5** (`next-auth`) with the Credentials provider (email + password) and the Prisma adapter, JWT sessions carrying `id`, `role`, `stage`, `onboarded`.
 - **Route protection**: `proxy.ts` (Next 16 renamed `middleware.ts` → `proxy.ts`) guards `/dashboard`, `/learn`, `/tribe`, `/admin`. Proxy is a fast, coarse gate only — every server action and route handler re-checks authorization via `lib/rbac.ts`, because proxy coverage can silently drop on refactors.
-- **Stripe** for giving (test mode), webhook at `/api/webhooks/stripe`.
+- **Stripe** for giving and paid-course checkout (test mode), webhook at `/api/webhooks/stripe` branches on `session.metadata.kind` to update either a `Transaction` or an `Enrollment`.
 - **Cloudflare R2** (S3-compatible) for media storage — see "Media & storage pipeline" below.
 
 ## Why Server Actions over hand-rolled API routes
@@ -50,18 +50,22 @@ Full schema in `prisma/schema.prisma`. Grouped by domain:
 - **Identity**: `User`, `Account`, `Session`, `VerificationToken` (Auth.js-compatible).
 - **Permissions**: `Permission`, `RolePermission`.
 - **Media**: `MediaAsset` (R2-backed; `kind` = `VIDEO`/`AUDIO`/`IMAGE`/`DOCUMENT`).
-- **LMS**: `Program → Course (authorId?) → Module → Lesson`, `Enrollment`, `LessonProgress`, `ReflectionEntry`, `JournalEntry`, `Certificate`.
-- **Community**: `Cohort → Tribe → TribeMembership`, `DiscussionPost/Comment`, `PrayerRequest`, `Testimony`.
+- **LMS**: `Program → Course (authorId?, CourseMentor[]) → Module (stage?) → Lesson`, `LessonResource` (reusable content-library attachments), `Quiz → QuizQuestion → QuizOption`, `QuizAttempt`, `Enrollment` (`cohortId?`, `paymentStatus`), `LessonProgress`, `ReflectionEntry`, `JournalEntry`, `Certificate`.
+- **Community**: `Cohort` (required `courseId`, `status`) `→ Tribe → TribeMembership`, `DiscussionPost/Comment`, `PrayerRequest`, `Testimony`.
 - **Events**: `Event`, `Speaker`, `EventRegistration`.
 - **Resources**: `Resource` — expanded content taxonomy (`ResourceType`: video/audio/sermon/PDF/ebook/document/study/workbook/devotional/article/external link/YouTube/event recording/live replay/image/teaching notes), `tags`, `visibility` (`PUBLIC`/`MEMBERS`/`STUDENTS`/`LEADERS`, gated via `lib/resource-labels.ts#canViewResource`), optional `speaker`/`program` connections, `mediaAsset` or `externalUrl`, self-referential `relatedTo`, `createdBy`, `viewCount`.
 - **Giving**: `Transaction`.
 - **Ops**: `Announcement`.
 
 Design choices:
-- `User.stage` (`PLANTED..SENT`) is the literal transformation-pathway pointer — computed/advanced server-side when a stage's courses are completed, not client-editable except by an admin override.
+- **Dynamic Course Engine**: `Program.slug` is a plain unique `String`, not an enum — admins create new programs from `/admin/programs` with zero migrations. `lib/constants.ts#FLAGSHIP_PROGRAM_SLUG` is the one deliberate, documented product-level constant (which program onboards a brand-new user by default); nothing else in application code names a specific program or course.
+- `User.stage` (`PLANTED..SENT`) is the literal transformation-pathway pointer. `Course.stage` is an optional coarse hint (nullable, for single-stage courses); `Module.stage` is the precise driver — a lesson's completion checks whether its `Module.stage` matches the user's current stage and, if so, whether every lesson in that module is now complete, before advancing. This decouples the universal pathway from any one course: a future "School of Prayer" can tag a module `ROOTED` and contribute to the same track. Course completion (all lessons, any stage) separately drives `Enrollment.status`/`Certificate` issuance, gated by `Course.certificateEnabled`.
+- **Cohorts belong to a course** (`Cohort.courseId` required) — one course can run many cohorts, each with its own timeline, mentors/tribes, and `CohortStatus` (`UPCOMING`/`ACTIVE`/`COMPLETED`). `Enrollment.cohortId` is optional (self-paced enrollments have none).
+- **Content reusability**: `LessonResource` is a join table between `Lesson` and the Phase-2 `Resource` library — one upload attaches to lessons across many courses without re-uploading.
+- **Quizzes are graded server-only**: the student-facing lesson query selects `QuizOption.id/label` but never `isCorrect`; grading and `QuizAttempt` creation happen entirely inside `submitQuizAttemptAction` (`lib/actions/lms.ts`).
 - Streaks are **derived**, not stored: computed from `LessonProgress.completedAt` / `JournalEntry.createdAt` timestamps at read time, so there's no counter to keep in sync or drift.
-- `ReflectionEntry.answers` is `Json` keyed by question index/text — the three guided prompts are stored on `Lesson.reflectionQuestions` (`String[]`) so they can change per lesson without a migration.
-- Enums model everything that's a closed set (`Role`, `Stage`, `ResourceCategory`, `ResourceType`, `ResourceVisibility`, etc.) for query-ability and referential integrity vs. free-text strings. Permissions are the one deliberately data-driven exception (see RBAC above).
+- `ReflectionEntry.answers` is `Json` keyed by question index/text — the three guided prompts are stored on `Lesson.reflectionQuestions` (`String[]`) so they can change per lesson without a migration. `Lesson.prayerPrompt` folds the prayer exercise into the same Reflection step rather than a separate pipeline stage.
+- Enums model everything that's a closed set (`Role`, `Stage`, `CourseStatus`, `CourseDifficulty`, `CourseFormat`, `CourseAccessLevel`, `PricingType`, `CohortStatus`, `PaymentStatus`, `ResourceCategory`, `ResourceType`, `ResourceVisibility`, etc.) for query-ability and referential integrity vs. free-text strings. `Program.slug` and permissions are the deliberately data-driven exceptions (see RBAC above).
 
 ## Folder structure
 

@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  createCohortAction,
-  createTribeAction,
-} from "@/lib/actions/admin";
+import { createTribeAction } from "@/lib/actions/admin";
 import { TribeMentorSelect } from "@/components/admin/tribe-mentor-select";
 import { requirePermission } from "@/lib/rbac";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -22,6 +19,7 @@ export default async function AdminCohortsPage() {
     prisma.cohort.findMany({
       orderBy: { startDate: "desc" },
       include: {
+        course: true,
         tribes: { include: { mentor: true, _count: { select: { members: true } } } },
       },
     }),
@@ -35,15 +33,24 @@ export default async function AdminCohortsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="font-heading text-2xl font-semibold">Cohorts & Tribes</h1>
-        <p className="text-sm text-muted-foreground">{cohorts.length} cohorts</p>
+        <p className="text-sm text-muted-foreground">
+          {cohorts.length} cohorts across every course. New cohorts are created from a course&apos;s
+          edit page.
+        </p>
       </div>
 
       {cohorts.map((cohort) => (
         <Card key={cohort.id} className="border-border/60">
           <CardContent className="p-6">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <p className="font-medium">{cohort.name}</p>
-              {cohort.active && <Badge variant="secondary">Active</Badge>}
+              <Badge variant="secondary">{cohort.status}</Badge>
+              <Link
+                href={`/admin/courses/${cohort.courseId}`}
+                className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                {cohort.course.title}
+              </Link>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -77,23 +84,11 @@ export default async function AdminCohortsPage() {
           </CardContent>
         </Card>
       ))}
-
-      <Card className="border-dashed border-border">
-        <CardContent className="p-6">
-          <p className="font-medium">New cohort</p>
-          <form action={createCohortAction} className="mt-4 flex flex-wrap items-end gap-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" name="name" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="slug">Slug</Label>
-              <Input id="slug" name="slug" required />
-            </div>
-            <Button type="submit">Create cohort</Button>
-          </form>
-        </CardContent>
-      </Card>
+      {cohorts.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          No cohorts yet — create one from a course&apos;s edit page.
+        </p>
+      )}
     </div>
   );
 }

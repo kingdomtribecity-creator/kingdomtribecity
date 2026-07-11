@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { computeStreak } from "@/lib/streak";
 import { STAGE_META } from "@/lib/stage";
-import { TRACK_COURSE_SLUG, deriveTrackStatus, type TrackStatus } from "@/lib/tracks";
+import { TRACK_STAGE, deriveTrackStatus, type TrackStatus } from "@/lib/tracks";
 import { StagePathway } from "@/components/dashboard/stage-pathway";
 import { StreakBadge } from "@/components/dashboard/streak-badge";
 import { JournalPanel } from "@/components/dashboard/journal-panel";
@@ -57,17 +57,13 @@ export default async function DashboardPage() {
     ...journalEntries.map((j) => j.createdAt),
   ]);
 
-  // Continue learning: first incomplete lesson, preferring the course matching the user's stage.
-  const sortedEnrollments = [...enrollments].sort((a, b) => {
-    if (a.course.stage === user.stage && b.course.stage !== user.stage) return -1;
-    if (b.course.stage === user.stage && a.course.stage !== user.stage) return 1;
-    return 0;
-  });
-
+  // Continue learning: prefer a lesson in a module matching the user's
+  // current stage (across any enrolled course); fall back to the first
+  // incomplete lesson anywhere.
   let continueLearning: { courseSlug: string; courseTitle: string; lessonSlug: string; lessonTitle: string } | null = null;
-  for (const enrollment of sortedEnrollments) {
-    const lessons = enrollment.course.modules.flatMap((m) => m.lessons);
-    const next = lessons.find((l) => progressByLesson.get(l.id)?.status !== "COMPLETED");
+  for (const enrollment of enrollments) {
+    const stageModule = enrollment.course.modules.find((m) => m.stage === user.stage);
+    const next = stageModule?.lessons.find((l) => progressByLesson.get(l.id)?.status !== "COMPLETED");
     if (next) {
       continueLearning = {
         courseSlug: enrollment.course.slug,
@@ -78,18 +74,29 @@ export default async function DashboardPage() {
       break;
     }
   }
-
-  const enrollmentByCourseSlug = new Map(enrollments.map((e) => [e.course.slug, e]));
-  const tracks = Object.entries(TRACK_COURSE_SLUG).map(([track, courseSlug]) => {
-    if (!courseSlug) {
-      return { track, status: "Upcoming" as TrackStatus };
+  if (!continueLearning) {
+    for (const enrollment of enrollments) {
+      const lessons = enrollment.course.modules.flatMap((m) => m.lessons);
+      const next = lessons.find((l) => progressByLesson.get(l.id)?.status !== "COMPLETED");
+      if (next) {
+        continueLearning = {
+          courseSlug: enrollment.course.slug,
+          courseTitle: enrollment.course.title,
+          lessonSlug: next.slug,
+          lessonTitle: next.title,
+        };
+        break;
+      }
     }
-    const enrollment = enrollmentByCourseSlug.get(courseSlug);
-    const lessons = enrollment?.course.modules.flatMap((m) => m.lessons) ?? [];
+  }
+
+  const tracks = Object.entries(TRACK_STAGE).map(([track, stage]) => {
+    const modules = enrollments.flatMap((e) => e.course.modules.filter((m) => m.stage === stage));
+    const lessons = modules.flatMap((m) => m.lessons);
     const completed = lessons.filter((l) => progressByLesson.get(l.id)?.status === "COMPLETED").length;
     return {
       track,
-      status: deriveTrackStatus(enrollment, completed, lessons.length),
+      status: deriveTrackStatus(modules.length > 0, completed, lessons.length) as TrackStatus,
     };
   });
 

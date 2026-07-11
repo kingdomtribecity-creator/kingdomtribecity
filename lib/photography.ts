@@ -4,7 +4,7 @@
  * once uploaded; nothing else in the UI needs to change.
  */
 export const PHOTOGRAPHY = {
-  plantedAndRooted:
+  rootedAndBuilt:
     "https://images.unsplash.com/photo-1712342109846-a8fcb1c883ba?w=1600&q=80&auto=format&fit=crop",
   youngAndYielded:
     "https://images.unsplash.com/photo-1691491071054-6371dfc47d6e?w=1600&q=80&auto=format&fit=crop",
@@ -19,8 +19,8 @@ export const PHOTOGRAPHY = {
 } as const;
 
 export const PROGRAM_PHOTO: Record<string, string> = {
-  PLANTED_AND_ROOTED: PHOTOGRAPHY.plantedAndRooted,
-  YOUNG_AND_YIELDED: PHOTOGRAPHY.youngAndYielded,
-  KINGDOM_WARRIOR_WOMAN: PHOTOGRAPHY.kingdomWarriorWoman,
-  KINGDOM_LEADERS: PHOTOGRAPHY.kingdomLeaders,
+  "rooted-and-built": PHOTOGRAPHY.rootedAndBuilt,
+  "young-and-yielded": PHOTOGRAPHY.youngAndYielded,
+  "kingdom-warrior-woman": PHOTOGRAPHY.kingdomWarriorWoman,
+  "kingdom-leaders": PHOTOGRAPHY.kingdomLeaders,
 };

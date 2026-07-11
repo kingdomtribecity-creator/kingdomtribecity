@@ -63,7 +63,7 @@ export function GiveForm() {
 
       <div className="space-y-2">
         <Label htmlFor="designation">Designation (optional)</Label>
-        <Input id="designation" name="designation" placeholder="e.g. Planted & Rooted" />
+        <Input id="designation" name="designation" placeholder="e.g. Rooted and Built" />
       </div>
 
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}

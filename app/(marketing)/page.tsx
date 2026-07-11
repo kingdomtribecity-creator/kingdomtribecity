@@ -10,7 +10,7 @@ import { ArrowRight } from "lucide-react";
 
 export default async function HomePage() {
   const [programs, testimonies, upcomingEvent] = await Promise.all([
-    prisma.program.findMany({ orderBy: { name: "asc" } }),
+    prisma.program.findMany({ where: { published: true }, orderBy: { name: "asc" } }),
     prisma.testimony.findMany({
       where: { approved: true, featured: true },
       take: 2,
@@ -26,11 +26,17 @@ export default async function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section
-        className="relative overflow-hidden text-white"
-        style={{ backgroundImage: BRAND_GRADIENT }}
-      >
-        <div className="mx-auto max-w-6xl px-4 py-28 sm:px-6 sm:py-36">
+      <section className="relative overflow-hidden text-white">
+        <Image
+          src={PHOTOGRAPHY.worship}
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0" style={{ backgroundImage: BRAND_GRADIENT, opacity: 0.82 }} />
+        <div className="relative mx-auto max-w-6xl px-4 py-28 sm:px-6 sm:py-36">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-white/70">
             A Kingdom movement
           </p>
@@ -96,7 +102,7 @@ export default async function HomePage() {
               <Card key={program.id} className="overflow-hidden border-border/60 py-0">
                 <div className="relative h-28">
                   <Image
-                    src={PROGRAM_PHOTO[program.slug] ?? PROGRAM_PHOTO.PLANTED_AND_ROOTED}
+                    src={PROGRAM_PHOTO[program.slug] ?? PHOTOGRAPHY.community}
                     alt=""
                     fill
                     sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"

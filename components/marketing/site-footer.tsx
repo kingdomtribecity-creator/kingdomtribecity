@@ -4,7 +4,7 @@ const COLUMNS = [
   {
     title: "Ecosystem",
     links: [
-      { href: "/programs", label: "Planted & Rooted" },
+      { href: "/programs", label: "Rooted and Built" },
       { href: "/expressions/young-and-yielded", label: "Young & Yielded" },
       { href: "/expressions/kingdom-warrior-woman", label: "Kingdom Warrior Woman" },
       { href: "/expressions/kingdom-leaders", label: "Kingdom Leaders" },

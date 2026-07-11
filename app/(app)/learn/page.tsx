@@ -14,9 +14,10 @@ export default async function LearnCatalogPage() {
   const user = await requireUser();
 
   const courses = await prisma.course.findMany({
-    where: { published: true },
+    where: { status: "PUBLISHED" },
     orderBy: { order: "asc" },
     include: {
+      program: true,
       modules: { include: { lessons: true } },
       enrollments: { where: { userId: user.id } },
     },
@@ -33,10 +34,9 @@ export default async function LearnCatalogPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <h1 className="font-heading text-3xl font-semibold">Planted & Rooted</h1>
+      <h1 className="font-heading text-3xl font-semibold">Explore courses</h1>
       <p className="mt-2 text-muted-foreground">
-        The flagship discipleship school — every course walks you further
-        along the pathway.
+        Every Kingdom Tribe City program and its courses, in one place.
       </p>
 
       <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -52,12 +52,17 @@ export default async function LearnCatalogPage() {
             <Link key={course.id} href={`/learn/${course.slug}`}>
               <Card className="h-full overflow-hidden border-border/60 py-0 transition-colors hover:border-primary/40">
                 <div
-                  className="flex h-28 items-end p-4"
+                  className="flex h-28 flex-col justify-between p-4"
                   style={{ backgroundImage: stageGradient(course.stage) }}
                 >
-                  <Badge variant="secondary" className="bg-white/15 text-white">
-                    {STAGE_META[course.stage].label}
+                  <Badge variant="secondary" className="w-fit bg-white/15 text-white">
+                    {course.program.name}
                   </Badge>
+                  {course.stage && (
+                    <Badge variant="secondary" className="w-fit bg-white/15 text-white">
+                      {STAGE_META[course.stage].label}
+                    </Badge>
+                  )}
                 </div>
                 <CardContent className="p-6">
                   <p className="font-heading text-lg font-medium">{course.title}</p>
@@ -70,9 +75,16 @@ export default async function LearnCatalogPage() {
                       </p>
                     </div>
                   ) : (
-                    <p className="mt-4 text-xs text-muted-foreground">
-                      {totalLessons} lesson{totalLessons === 1 ? "" : "s"}
-                    </p>
+                    <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {totalLessons} lesson{totalLessons === 1 ? "" : "s"}
+                      </span>
+                      {course.pricingType === "PAID" && (
+                        <Badge variant="outline">
+                          ${((course.priceCents ?? 0) / 100).toFixed(0)}
+                        </Badge>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>

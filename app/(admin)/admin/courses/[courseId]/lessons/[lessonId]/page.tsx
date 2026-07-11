@@ -6,9 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { updateLessonAction, deleteLessonAction } from "@/lib/actions/admin";
+import {
+  saveQuizAction,
+  deleteQuizAction,
+  attachResourcesToLessonAction,
+} from "@/lib/actions/admin-lesson-content";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { PERMISSIONS } from "@/lib/permissions";
+import { QuizBuilder } from "@/components/admin/quiz-builder";
 
 export default async function AdminLessonEditPage({
   params,
@@ -17,9 +24,16 @@ export default async function AdminLessonEditPage({
 }) {
   const { courseId, lessonId } = await params;
   const user = await requirePermission(PERMISSIONS.CONTENT_MANAGE);
-  const [lesson, course] = await Promise.all([
-    prisma.lesson.findUnique({ where: { id: lessonId } }),
+  const [lesson, course, allResources] = await Promise.all([
+    prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: {
+        quiz: { include: { questions: { orderBy: { order: "asc" }, include: { options: true } } } },
+        attachedResources: { select: { resourceId: true } },
+      },
+    }),
     prisma.course.findUnique({ where: { id: courseId }, select: { authorId: true } }),
+    prisma.resource.findMany({ select: { id: true, title: true }, orderBy: { title: "asc" } }),
   ]);
   if (!lesson) notFound();
   if (user.role === "INSTRUCTOR" && course?.authorId !== user.id) {
@@ -28,6 +42,9 @@ export default async function AdminLessonEditPage({
 
   const boundUpdate = updateLessonAction.bind(null, lessonId, courseId);
   const boundDelete = deleteLessonAction.bind(null, lessonId, courseId);
+  const boundSaveQuiz = saveQuizAction.bind(null, lessonId, courseId);
+  const boundAttachResources = attachResourcesToLessonAction.bind(null, lessonId, courseId);
+  const attachedIds = new Set(lesson.attachedResources.map((r) => r.resourceId));
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -85,6 +102,15 @@ export default async function AdminLessonEditPage({
               />
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="prayerPrompt">Prayer exercise</Label>
+              <Textarea
+                id="prayerPrompt"
+                name="prayerPrompt"
+                rows={2}
+                defaultValue={lesson.prayerPrompt ?? ""}
+              />
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="assignmentPrompt">Assignment prompt</Label>
               <Textarea
                 id="assignmentPrompt"
@@ -111,6 +137,56 @@ export default async function AdminLessonEditPage({
               Delete lesson
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/60">
+        <CardContent className="p-6">
+          <p className="font-medium">Attach from library</p>
+          <p className="text-sm text-muted-foreground">
+            Reuse an uploaded resource for this lesson&apos;s teaching, downloads, or notes —
+            without uploading it again.
+          </p>
+          <form action={boundAttachResources} className="mt-4 space-y-4">
+            <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-md border border-border p-3">
+              {allResources.map((r) => (
+                <label key={r.id} className="flex items-center gap-2 text-sm">
+                  <Checkbox name="resourceIds" value={r.id} defaultChecked={attachedIds.has(r.id)} />
+                  {r.title}
+                </label>
+              ))}
+              {allResources.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No resources in the library yet — add some at /admin/resources.
+                </p>
+              )}
+            </div>
+            <Button type="submit" size="sm" variant="outline">
+              Save attachments
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/60">
+        <CardContent className="p-6">
+          <p className="font-medium">Quiz</p>
+          <p className="text-sm text-muted-foreground">
+            Optional — students see this between Reflection and Assignment.
+          </p>
+          <div className="mt-4">
+            <QuizBuilder action={boundSaveQuiz} quiz={lesson.quiz ?? undefined} />
+          </div>
+          {lesson.quiz && (
+            <form
+              action={deleteQuizAction.bind(null, lesson.quiz.id, lessonId, courseId)}
+              className="mt-4 border-t border-border pt-4"
+            >
+              <Button type="submit" variant="destructive" size="sm">
+                Remove quiz
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

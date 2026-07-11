@@ -5,7 +5,16 @@ import { redirect } from "next/navigation";
 import { requireAdmin, requirePermission, ForbiddenError } from "@/lib/rbac";
 import { PERMISSIONS } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import type { Role, Stage } from "@/lib/generated/prisma/enums";
+import type {
+  Role,
+  Stage,
+  CourseStatus,
+  CourseDifficulty,
+  CourseFormat,
+  CourseAccessLevel,
+  PricingType,
+  CohortStatus,
+} from "@/lib/generated/prisma/enums";
 
 /** Instructors may only touch courses they authored; every other content-manage role can touch any course. */
 async function assertCourseAccess(courseId: string) {
@@ -15,6 +24,23 @@ async function assertCourseAccess(courseId: string) {
   const course = await prisma.course.findUnique({ where: { id: courseId }, select: { authorId: true } });
   if (course?.authorId !== user.id) throw new ForbiddenError("You can only edit your own courses.");
   return user;
+}
+
+function optionalStr(formData: FormData, key: string): string | null {
+  const v = String(formData.get(key) ?? "").trim();
+  return v || null;
+}
+
+function optionalInt(formData: FormData, key: string): number | null {
+  const v = String(formData.get(key) ?? "").trim();
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function optionalDate(formData: FormData, key: string): Date | null {
+  const v = String(formData.get(key) ?? "").trim();
+  return v ? new Date(v) : null;
 }
 
 // ── Roles & Permissions ──────────────────────────────────────────────
@@ -51,26 +77,65 @@ export async function updateUserStageAction(userId: string, stage: Stage) {
 
 // ── Courses / Modules / Lessons ───────────────────────────────────────
 
+function courseFieldsFromForm(formData: FormData) {
+  const mentorIds = formData.getAll("mentorIds").map(String);
+  return {
+    title: String(formData.get("title") ?? "").trim(),
+    subtitle: optionalStr(formData, "subtitle"),
+    description: String(formData.get("description") ?? "").trim(),
+    stage: (optionalStr(formData, "stage") as Stage | null) ?? null,
+    category: optionalStr(formData, "category"),
+    difficulty: (optionalStr(formData, "difficulty") as CourseDifficulty | null) ?? null,
+    durationLabel: optionalStr(formData, "durationLabel"),
+    startDate: optionalDate(formData, "startDate"),
+    endDate: optionalDate(formData, "endDate"),
+    format: (String(formData.get("format") ?? "SELF_PACED") as CourseFormat),
+    accessLevel: (String(formData.get("accessLevel") ?? "PUBLIC") as CourseAccessLevel),
+    pricingType: (String(formData.get("pricingType") ?? "FREE") as PricingType),
+    priceCents: (() => {
+      const dollars = optionalInt(formData, "priceDollars");
+      return dollars !== null ? dollars * 100 : null;
+    })(),
+    certificateEnabled: formData.get("certificateEnabled") === "on",
+    status: (String(formData.get("status") ?? "DRAFT") as CourseStatus),
+    coverImage: optionalStr(formData, "coverImage"),
+    authorId: optionalStr(formData, "authorId"),
+    mentorIds,
+  };
+}
+
 export async function createCourseAction(formData: FormData) {
   const user = await requirePermission(PERMISSIONS.CONTENT_MANAGE);
   const programId = String(formData.get("programId"));
-  const title = String(formData.get("title") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim();
-  const stage = String(formData.get("stage")) as Stage;
-  const description = String(formData.get("description") ?? "").trim();
-  const subtitle = String(formData.get("subtitle") ?? "").trim() || null;
+  const fields = courseFieldsFromForm(formData);
 
-  if (!title || !slug || !stage || !description || !programId) return;
+  if (!fields.title || !slug || !fields.description || !programId) return;
 
   const course = await prisma.course.create({
     data: {
       programId,
-      title,
       slug,
-      stage,
-      description,
-      subtitle,
-      authorId: user.role === "INSTRUCTOR" ? user.id : null,
+      title: fields.title,
+      subtitle: fields.subtitle,
+      description: fields.description,
+      stage: fields.stage,
+      category: fields.category,
+      difficulty: fields.difficulty,
+      durationLabel: fields.durationLabel,
+      startDate: fields.startDate,
+      endDate: fields.endDate,
+      format: fields.format,
+      accessLevel: fields.accessLevel,
+      pricingType: fields.pricingType,
+      priceCents: fields.priceCents,
+      certificateEnabled: fields.certificateEnabled,
+      status: fields.status,
+      coverImage: fields.coverImage,
+      authorId: user.role === "INSTRUCTOR" ? user.id : fields.authorId,
+      mentors: fields.mentorIds.length
+        ? { create: fields.mentorIds.map((userId) => ({ userId })) }
+        : undefined,
     },
   });
 
@@ -79,16 +144,36 @@ export async function createCourseAction(formData: FormData) {
 }
 
 export async function updateCourseAction(courseId: string, formData: FormData) {
-  await assertCourseAccess(courseId);
-  const title = String(formData.get("title") ?? "").trim();
-  const subtitle = String(formData.get("subtitle") ?? "").trim() || null;
-  const description = String(formData.get("description") ?? "").trim();
-  const stage = String(formData.get("stage")) as Stage;
-  const published = formData.get("published") === "on";
+  const user = await assertCourseAccess(courseId);
+  const fields = courseFieldsFromForm(formData);
 
   await prisma.course.update({
     where: { id: courseId },
-    data: { title, subtitle, description, stage, published },
+    data: {
+      title: fields.title,
+      subtitle: fields.subtitle,
+      description: fields.description,
+      stage: fields.stage,
+      category: fields.category,
+      difficulty: fields.difficulty,
+      durationLabel: fields.durationLabel,
+      startDate: fields.startDate,
+      endDate: fields.endDate,
+      format: fields.format,
+      accessLevel: fields.accessLevel,
+      pricingType: fields.pricingType,
+      priceCents: fields.priceCents,
+      certificateEnabled: fields.certificateEnabled,
+      status: fields.status,
+      coverImage: fields.coverImage,
+      // Instructors can't reassign authorship or the mentor roster of their own course.
+      ...(user.role === "INSTRUCTOR"
+        ? {}
+        : {
+            authorId: fields.authorId,
+            mentors: { deleteMany: {}, create: fields.mentorIds.map((userId) => ({ userId })) },
+          }),
+    },
   });
 
   revalidatePath(`/admin/courses/${courseId}`);
@@ -98,14 +183,24 @@ export async function updateCourseAction(courseId: string, formData: FormData) {
 export async function createModuleAction(courseId: string, formData: FormData) {
   await assertCourseAccess(courseId);
   const title = String(formData.get("title") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
+  const description = optionalStr(formData, "description");
+  const stage = (optionalStr(formData, "stage") as Stage | null) ?? null;
   if (!title) return;
 
   const count = await prisma.module.count({ where: { courseId } });
   await prisma.module.create({
-    data: { courseId, title, description, order: count },
+    data: { courseId, title, description, stage, order: count },
   });
 
+  revalidatePath(`/admin/courses/${courseId}`);
+}
+
+export async function updateModuleStageAction(moduleId: string, courseId: string, stage: Stage | "") {
+  await assertCourseAccess(courseId);
+  await prisma.module.update({
+    where: { id: moduleId },
+    data: { stage: stage || null },
+  });
   revalidatePath(`/admin/courses/${courseId}`);
 }
 
@@ -153,13 +248,14 @@ export async function updateLessonAction(
     where: { id: lessonId },
     data: {
       title: String(formData.get("title") ?? "").trim(),
-      summary: String(formData.get("summary") ?? "").trim() || null,
-      teachingBody: String(formData.get("teachingBody") ?? "").trim() || null,
-      teachingVideoUrl: String(formData.get("teachingVideoUrl") ?? "").trim() || null,
+      summary: optionalStr(formData, "summary"),
+      teachingBody: optionalStr(formData, "teachingBody"),
+      teachingVideoUrl: optionalStr(formData, "teachingVideoUrl"),
       scriptureRefs,
-      scriptureText: String(formData.get("scriptureText") ?? "").trim() || null,
-      assignmentPrompt: String(formData.get("assignmentPrompt") ?? "").trim() || null,
-      journalPrompt: String(formData.get("journalPrompt") ?? "").trim() || null,
+      scriptureText: optionalStr(formData, "scriptureText"),
+      prayerPrompt: optionalStr(formData, "prayerPrompt"),
+      assignmentPrompt: optionalStr(formData, "assignmentPrompt"),
+      journalPrompt: optionalStr(formData, "journalPrompt"),
     },
   });
 
@@ -176,15 +272,25 @@ export async function deleteLessonAction(lessonId: string, courseId: string) {
 
 // ── Cohorts / Tribes ──────────────────────────────────────────────────
 
-export async function createCohortAction(formData: FormData) {
-  await requirePermission(PERMISSIONS.COHORTS_MANAGE);
+export async function createCohortAction(courseId: string, formData: FormData) {
+  await assertCourseAccess(courseId);
   const name = String(formData.get("name") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim();
+  const startDate = optionalDate(formData, "startDate") ?? new Date();
+  const endDate = optionalDate(formData, "endDate");
   if (!name || !slug) return;
 
   await prisma.cohort.create({
-    data: { name, slug, startDate: new Date() },
+    data: { courseId, name, slug, startDate, endDate },
   });
+  revalidatePath(`/admin/courses/${courseId}`);
+  revalidatePath("/admin/cohorts");
+}
+
+export async function updateCohortStatusAction(cohortId: string, courseId: string, status: CohortStatus) {
+  await assertCourseAccess(courseId);
+  await prisma.cohort.update({ where: { id: cohortId }, data: { status } });
+  revalidatePath(`/admin/courses/${courseId}`);
   revalidatePath("/admin/cohorts");
 }
 
@@ -192,7 +298,7 @@ export async function createTribeAction(cohortId: string, formData: FormData) {
   await requirePermission(PERMISSIONS.COHORTS_MANAGE);
   const name = String(formData.get("name") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim();
-  const mentorId = String(formData.get("mentorId") ?? "") || null;
+  const mentorId = optionalStr(formData, "mentorId");
   if (!name || !slug) return;
 
   await prisma.tribe.create({
@@ -216,10 +322,12 @@ export async function createAnnouncementAction(formData: FormData) {
   await requirePermission(PERMISSIONS.ANNOUNCEMENTS_MANAGE);
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
+  const cohortId = optionalStr(formData, "cohortId");
   if (!title || !body) return;
 
-  await prisma.announcement.create({ data: { title, body } });
+  await prisma.announcement.create({ data: { title, body, cohortId } });
   revalidatePath("/admin/announcements");
+  if (cohortId) revalidatePath(`/tribe`);
 }
 
 export async function togglePinAnnouncementAction(id: string, pinned: boolean) {

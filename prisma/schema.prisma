@@ -67,9 +67,11 @@ model User {
   eventRegistrations EventRegistration[]
   transactions       Transaction[]
 
-  authoredCourses  Course[]     @relation("CourseAuthor")
-  createdResources Resource[]   @relation("ResourceCreator")
+  authoredCourses  Course[]       @relation("CourseAuthor")
+  mentoredCourses  CourseMentor[]
+  createdResources Resource[]     @relation("ResourceCreator")
   uploadedMedia    MediaAsset[]
+  quizAttempts     QuizAttempt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -177,20 +179,14 @@ model VerificationToken {
 // LMS — Programs / Courses / Modules / Lessons
 // ─────────────────────────────────────────────────────────────────────────
 
-enum ProgramSlug {
-  PLANTED_AND_ROOTED
-  YOUNG_AND_YIELDED
-  KINGDOM_WARRIOR_WOMAN
-  KINGDOM_LEADERS
-}
-
 model Program {
-  id          String      @id @default(cuid())
-  slug        ProgramSlug @unique
+  id          String  @id @default(cuid())
+  slug        String  @unique
   name        String
   tagline     String
   description String
   heroImage   String?
+  published   Boolean @default(true)
 
   courses   Course[]
   events    Event[]
@@ -198,6 +194,38 @@ model Program {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum CourseStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+/** How the course is structured/delivered — drives whether Cohorts make sense for it. */
+enum CourseFormat {
+  SELF_PACED
+  COHORT_BASED
+  CHALLENGE
+  INTENSIVE
+  CERTIFICATION
+}
+
+enum CourseAccessLevel {
+  PUBLIC
+  PRIVATE
+}
+
+enum PricingType {
+  FREE
+  PAID
 }
 
 model Course {
@@ -208,22 +236,49 @@ model Course {
   title       String
   subtitle    String?
   description String
-  stage       Stage
+  /** Coarse hint for single-stage courses; multi-stage courses (e.g. Rooted and Built) leave this null and tag Stage per-Module instead. */
+  stage       Stage?
   coverImage  String?
   order       Int     @default(0)
-  published   Boolean @default(true)
+  status      CourseStatus @default(DRAFT)
+
+  category           String?
+  difficulty         CourseDifficulty?
+  durationLabel      String?
+  startDate          DateTime?
+  endDate            DateTime?
+  format             CourseFormat      @default(SELF_PACED)
+  accessLevel        CourseAccessLevel @default(PUBLIC)
+  pricingType        PricingType       @default(FREE)
+  priceCents         Int?
+  certificateEnabled Boolean           @default(true)
 
   program      Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
   author       User?         @relation("CourseAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  mentors      CourseMentor[]
   modules      Module[]
   enrollments  Enrollment[]
   certificates Certificate[]
+  cohorts      Cohort[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([programId])
   @@index([authorId])
+  @@index([status])
+}
+
+/** Course-level default mentors (distinct from a Tribe's mentor within a specific cohort). */
+model CourseMentor {
+  id       String @id @default(cuid())
+  courseId String
+  userId   String
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId])
 }
 
 model Module {
@@ -232,6 +287,8 @@ model Module {
   title       String
   description String?
   order       Int     @default(0)
+  /** Which stage of the Planted→Sent pathway completing this module forms — drives stage advancement. */
+  stage       Stage?
 
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
@@ -254,6 +311,7 @@ model Lesson {
   scriptureRefs       String[]
   scriptureText       String?
   reflectionQuestions String[]
+  prayerPrompt        String?
   assignmentPrompt    String?
   journalPrompt       String?
 
@@ -262,6 +320,8 @@ model Lesson {
   progress          LessonProgress[]
   reflectionEntries ReflectionEntry[]
   journalEntries    JournalEntry[]
+  attachedResources LessonResource[]
+  quiz              Quiz?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -270,26 +330,106 @@ model Lesson {
   @@index([moduleId])
 }
 
+/** Reusable content library attachments — one Resource upload can back lessons across many courses. */
+model LessonResource {
+  id         String @id @default(cuid())
+  lessonId   String
+  resourceId String
+  order      Int    @default(0)
+
+  lesson   Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, resourceId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Quizzes
+// ─────────────────────────────────────────────────────────────────────────
+
+model Quiz {
+  id               String @id @default(cuid())
+  lessonId         String @unique
+  title            String
+  passScorePercent Int    @default(70)
+
+  lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+}
+
+model QuizQuestion {
+  id     String @id @default(cuid())
+  quizId String
+  prompt String
+  order  Int    @default(0)
+
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options QuizOption[]
+
+  @@index([quizId])
+}
+
+model QuizOption {
+  id         String  @id @default(cuid())
+  questionId String
+  label      String
+  isCorrect  Boolean @default(false)
+
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model QuizAttempt {
+  id           String  @id @default(cuid())
+  quizId       String
+  userId       String
+  scorePercent Int
+  passed       Boolean
+  answers      Json
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([quizId, userId])
+}
+
 enum EnrollmentStatus {
   ACTIVE
   COMPLETED
   PAUSED
 }
 
+enum PaymentStatus {
+  NONE
+  PENDING
+  PAID
+  FAILED
+}
+
 model Enrollment {
   id       String           @id @default(cuid())
   userId   String
   courseId String
+  cohortId String?
   status   EnrollmentStatus @default(ACTIVE)
+
+  paymentStatus           PaymentStatus @default(NONE)
+  stripeCheckoutSessionId String?       @unique
 
   enrolledAt  DateTime  @default(now())
   completedAt DateTime?
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  cohort Cohort? @relation(fields: [cohortId], references: [id], onDelete: SetNull)
 
   @@unique([userId, courseId])
   @@index([courseId])
+  @@index([cohortId])
 }
 
 enum LessonStatus {
@@ -364,16 +504,30 @@ model Certificate {
 // Community — Cohorts / Tribes / Discussions / Prayer / Testimonies
 // ─────────────────────────────────────────────────────────────────────────
 
+enum CohortStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+}
+
 model Cohort {
-  id        String   @id @default(cuid())
-  slug      String   @unique
+  id        String       @id @default(cuid())
+  courseId  String
+  slug      String       @unique
   name      String
   startDate DateTime
-  active    Boolean  @default(true)
+  endDate   DateTime?
+  status    CohortStatus @default(UPCOMING)
 
-  tribes Tribe[]
+  course        Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  tribes        Tribe[]
+  enrollments   Enrollment[]
+  announcements Announcement[]
+  events        Event[]
 
   createdAt DateTime @default(now())
+
+  @@index([courseId])
 }
 
 model Tribe {
@@ -490,6 +644,7 @@ model Speaker {
 model Event {
   id           String    @id @default(cuid())
   programId    String?
+  cohortId     String?
   slug         String    @unique
   title        String
   description  String
@@ -500,6 +655,7 @@ model Event {
   recordingUrl String?
 
   program  Program?  @relation(fields: [programId], references: [id], onDelete: SetNull)
+  cohort   Cohort?   @relation(fields: [cohortId], references: [id], onDelete: SetNull)
   speakers Speaker[]
 
   registrations EventRegistration[]
@@ -507,6 +663,7 @@ model Event {
   createdAt DateTime @default(now())
 
   @@index([startsAt])
+  @@index([cohortId])
 }
 
 model EventRegistration {
@@ -591,6 +748,8 @@ model Resource {
   relatedTo  Resource[] @relation("RelatedResources")
   relatedBy  Resource[] @relation("RelatedResources")
 
+  lessonAttachments LessonResource[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -639,10 +798,15 @@ model Transaction {
 
 model Announcement {
   id        String  @id @default(cuid())
+  cohortId  String?
   title     String
   body      String
   pinned    Boolean @default(false)
   published Boolean @default(true)
 
+  cohort Cohort? @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
+
+  @@index([cohortId])
 }

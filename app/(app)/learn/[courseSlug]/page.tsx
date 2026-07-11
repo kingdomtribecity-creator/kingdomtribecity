@@ -3,8 +3,10 @@ import Link from "next/link";
 import { requireUser } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { CourseHero } from "@/components/lms/course-hero";
+import { PurchaseCourseButton } from "@/components/lms/purchase-course-button";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Award } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle2, Circle, Award, Lock } from "lucide-react";
 import { enrollInCourseAction } from "@/lib/actions/lms";
 import { cn } from "@/lib/utils";
 
@@ -19,12 +21,13 @@ export default async function CourseDetailPage({
   const course = await prisma.course.findUnique({
     where: { slug: courseSlug },
     include: {
+      program: true,
       modules: { orderBy: { order: "asc" }, include: { lessons: { orderBy: { order: "asc" } } } },
       enrollments: { where: { userId: user.id } },
       certificates: { where: { userId: user.id } },
     },
   });
-  if (!course || !course.published) notFound();
+  if (!course || course.status !== "PUBLISHED") notFound();
 
   const allLessons = course.modules.flatMap((m) => m.lessons);
   const progress = await prisma.lessonProgress.findMany({
@@ -32,7 +35,10 @@ export default async function CourseDetailPage({
   });
   const progressByLesson = new Map(progress.map((p) => [p.lessonId, p]));
 
-  const isEnrolled = course.enrollments.length > 0;
+  const enrollment = course.enrollments[0];
+  const isEnrolled = Boolean(enrollment);
+  const isPaidCourse = course.pricingType === "PAID";
+  const hasAccess = !isPaidCourse || enrollment?.paymentStatus === "PAID";
   const isCertified = course.certificates.length > 0;
   const firstIncomplete = allLessons.find(
     (l) => progressByLesson.get(l.id)?.status !== "COMPLETED"
@@ -46,12 +52,15 @@ export default async function CourseDetailPage({
         subtitle={course.subtitle}
         stage={course.stage}
         coverImage={course.coverImage}
+        programName={course.program.name}
       />
 
       <p className="mt-8 text-muted-foreground">{course.description}</p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        {!isEnrolled ? (
+        {isPaidCourse && !hasAccess ? (
+          <PurchaseCourseButton courseId={course.id} priceCents={course.priceCents ?? 0} />
+        ) : !isEnrolled ? (
           <form action={enrollAction}>
             <Button type="submit">Enroll in this course</Button>
           </form>
@@ -78,8 +87,9 @@ export default async function CourseDetailPage({
       <div className="mt-12 space-y-8">
         {course.modules.map((mod, mi) => (
           <div key={mod.id}>
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               Module {mi + 1} · {mod.title}
+              {mod.stage && <Badge variant="outline">{mod.stage}</Badge>}
             </p>
             <div className="mt-3 divide-y divide-border rounded-lg border border-border/60">
               {mod.lessons.map((lesson) => {
@@ -87,7 +97,9 @@ export default async function CourseDetailPage({
                 const done = status === "COMPLETED";
                 const inner = (
                   <div className="flex items-center gap-3 p-4">
-                    {done ? (
+                    {!hasAccess ? (
+                      <Lock className="size-5 shrink-0 text-muted-foreground/40" />
+                    ) : done ? (
                       <CheckCircle2 className="size-5 shrink-0 text-growth" />
                     ) : (
                       <Circle className="size-5 shrink-0 text-muted-foreground/40" />
@@ -102,7 +114,7 @@ export default async function CourseDetailPage({
                     </div>
                   </div>
                 );
-                return isEnrolled ? (
+                return isEnrolled && hasAccess ? (
                   <Link
                     key={lesson.id}
                     href={`/learn/${course.slug}/${lesson.slug}`}
