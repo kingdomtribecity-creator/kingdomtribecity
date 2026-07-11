@@ -9,22 +9,30 @@ import {
   BookOpen,
   UsersRound,
   Megaphone,
+  Library,
+  FolderOpen,
+  ShieldCheck,
 } from "lucide-react";
+import type { Role } from "@/lib/generated/prisma/enums";
 
-const LINKS = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/courses", label: "Courses", icon: BookOpen },
-  { href: "/admin/cohorts", label: "Cohorts & Tribes", icon: UsersRound },
-  { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
+const LINKS: { href: string; label: string; icon: typeof LayoutDashboard; roles: Role[] }[] = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER"] },
+  { href: "/admin/users", label: "Users", icon: Users, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { href: "/admin/courses", label: "Courses", icon: BookOpen, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER", "INSTRUCTOR"] },
+  { href: "/admin/resources", label: "Resources", icon: Library, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER", "INSTRUCTOR"] },
+  { href: "/admin/media", label: "Media", icon: FolderOpen, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER", "INSTRUCTOR"] },
+  { href: "/admin/cohorts", label: "Cohorts & Tribes", icon: UsersRound, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER"] },
+  { href: "/admin/announcements", label: "Announcements", icon: Megaphone, roles: ["SUPER_ADMIN", "ADMIN", "MINISTRY_LEADER"] },
+  { href: "/admin/settings/roles", label: "Roles & Permissions", icon: ShieldCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
 ];
 
-export function AdminNav() {
+export function AdminNav({ role }: { role: Role }) {
   const pathname = usePathname();
+  const links = LINKS.filter((link) => link.roles.includes(role));
 
   return (
     <nav className="flex flex-col gap-1">
-      {LINKS.map((link) => {
+      {links.map((link) => {
         const active =
           link.href === "/admin"
             ? pathname === "/admin"

@@ -1,34 +1,49 @@
 # Roadmap
 
-## This build (deep)
+## Phase 1 — Founding build (deep)
 
-- Public marketing site (all sections from the PRD)
-- Auth: sign-up, sign-in, onboarding, RBAC (`GUEST/STUDENT/MENTOR/ADMIN`)
+- Public marketing site (all sections from the PRD), now with curated photography (`lib/photography.ts`)
+- Auth: sign-up, sign-in, onboarding
 - Planted & Rooted LMS: 3 courses (Planted, Rooted, Formed) with modules/lessons, full Teaching → Scripture → Reflection → Assignment → Journal flow, progress tracking, certificate on course completion
-- Personal Growth Dashboard: stage pathway, per-track status, streak, continue-learning, journal, saved teachings
+- Personal Growth Dashboard: stage pathway, per-track status, streak, continue-learning, journal
 - Community: one Cohort ("Planted and Rooted Cohort One") with three Tribes (Deborah, Daniel, Esther) — discussion feed, prayer requests, mentor view
 - Admin dashboard: Users, Courses/Modules/Lessons CRUD, Cohorts/Tribes/Mentors, Announcements, analytics overview
 
+## Phase 2 — RBAC, content engine & storage foundation (deep)
+
+- **Scalable RBAC**: 8 roles (`SUPER_ADMIN`, `ADMIN`, `MINISTRY_LEADER`, `INSTRUCTOR`, `MENTOR`, `STUDENT`, `MEMBER`, `GUEST`) with a data-driven `Permission`/`RolePermission` system, editable at `/admin/settings/roles` with no redeploy. See `docs/ARCHITECTURE.md`.
+- **Cloudflare R2 media pipeline**: presigned direct-to-bucket uploads, generic `MediaAsset` library (`/admin/media`), signed-proxy serving fallback for private buckets (`/api/media/[...key]`).
+- **Expanded content model**: `Resource` now covers the full taxonomy (video/audio/sermon/PDF/ebook/document/study/workbook/devotional/article/external link/YouTube/event recording/live replay/image/teaching notes), with tags, visibility tiers, speaker/program connections, and related-resources — full CRUD at `/admin/resources`, built end-to-end through the R2 pipeline.
+- **Instructor role wired into the existing admin**: reuses the admin course editor (no parallel UI), scoped to courses/resources the instructor authored (`Course.authorId`, `Resource.createdById`).
+- **Curated photography**: real, hand-picked Unsplash imagery on the homepage, `/programs`, and course heroes, replaceable with R2-hosted originals with no code change (`lib/photography.ts`).
+
 ## Scaffolded (schema-complete, minimal UI — extend when prioritized)
 
-- **Young & Yielded / Kingdom Warrior Woman / Kingdom Leaders** — `app/(app)/expressions/[program]` renders program hero + its events/resources from the shared `Program`/`Event`/`Resource` models; no program-specific UI yet.
-- **Events system** — list + detail + registration works end-to-end; no reminders/calendar sync; recordings field exists but no upload pipeline.
-- **Resource library** — categorized list + detail works; `mediaUrl` is a plain URL field, no upload/CDN pipeline.
+- **Young & Yielded / Kingdom Warrior Woman / Kingdom Leaders** — `app/(marketing)/expressions/[program]` renders program hero + its events/resources from the shared `Program`/`Event`/`Resource` models; no program-specific UI yet.
+- **Events system** — list + detail + registration works end-to-end; no reminders/calendar sync; recordings field exists but no upload pipeline (could now reuse the R2 uploader built in Phase 2).
 - **Giving** — Stripe Checkout wired for one-time test-mode payment and `Transaction` persistence via webhook; recurring billing and fund designations are modeled in the schema but not exposed in the UI.
-- **Mentor tooling** — Tribe view surfaces member list/progress; no dedicated mentor analytics or messaging yet.
 - **Testimonies** — model + admin approval flag exist; public `/testimonies` page reads approved ones; no submission form yet.
 
-## Explicitly out of scope this phase
+## Deferred from Phase 2 (raised in the same request, intentionally scoped out)
+
+- **Dedicated Mentor dashboard** — today mentors use the same Tribe page as students, with a moderation affordance. A real cross-Tribe mentor view (multiple tribes, reports, lightweight messaging) is still open.
+- **Dedicated Instructor dashboard** — deliberately deferred in favor of reusing the scoped admin course editor this phase; a purpose-built teaching-analytics view is a future upgrade if instructors outgrow the admin reuse.
+- **Assignment submission capture & review** — the lesson stepper's Assignment step is currently a self-attested checkbox, not a real submission. Capturing actual text/file submissions (a new `AssignmentSubmission` model) and a mentor/instructor review + feedback UI is the natural next step and would unlock the "review submissions" / "feedback system" requirements.
+- **Saved/bookmarked resources** on the student dashboard.
+- **Content performance analytics** beyond the basic `Resource.viewCount` now being tracked — no dashboard surfaces it yet.
+
+## Explicitly out of scope
 
 - Native mobile apps
 - i18n/localization
-- Custom video/streaming infrastructure (lessons embed hosted video URLs)
+- Custom video/streaming infrastructure (lessons and resources embed hosted video URLs or R2-hosted files, not a custom transcoding/streaming pipeline)
 - Push notifications / email digest automation
 
 ## Suggested next milestones
 
-1. Build out one full "Expression" (start with Young & Yielded — highest community-building upside) to the same depth as Planted & Rooted.
-2. Resource upload pipeline (S3/R2 + signed URLs) to replace plain `mediaUrl`.
+1. Assignment submission model + mentor/instructor review UI (unlocks two deferred items at once).
+2. Build out one full "Expression" (start with Young & Yielded — highest community-building upside) to the same depth as Planted & Rooted.
 3. Recurring giving + designation picker in the `/give` flow.
-4. Mentor dashboard: cross-Tribe view for mentors managing multiple tribes, lightweight messaging.
+4. Dedicated Mentor dashboard: cross-Tribe view, reports, lightweight messaging.
 5. Testimony submission + moderation queue in Admin.
+6. Once `R2_PUBLIC_URL` (custom domain or R2.dev) is configured, verify the pipeline switches over automatically and consider adding a CDN cache layer for large video delivery.

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/rbac";
 import {
   Table,
   TableBody,
@@ -13,6 +14,7 @@ import { UserRowControls } from "@/components/admin/user-row-controls";
 export const metadata: Metadata = { title: "Users" };
 
 export default async function AdminUsersPage() {
+  await requireAdmin();
   const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
 
   return (

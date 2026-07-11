@@ -2,6 +2,8 @@ import "dotenv/config";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import { PERMISSION_CATALOG, DEFAULT_ROLE_PERMISSIONS } from "../lib/permissions";
+import type { Role } from "../lib/generated/prisma/enums";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -46,7 +48,7 @@ async function main() {
     },
   });
 
-  await prisma.program.upsert({
+  const kingdomWarriorWoman = await prisma.program.upsert({
     where: { slug: "KINGDOM_WARRIOR_WOMAN" },
     update: {},
     create: {
@@ -58,7 +60,7 @@ async function main() {
     },
   });
 
-  await prisma.program.upsert({
+  const kingdomLeaders = await prisma.program.upsert({
     where: { slug: "KINGDOM_LEADERS" },
     update: {},
     create: {
@@ -69,6 +71,30 @@ async function main() {
         "Kingdom Leaders develops character, competence, and calling in those God is raising to lead in the Church and every sphere of society.",
     },
   });
+
+  // ── Permissions ──────────────────────────────────────────────────────
+  const permissionIdByKey = new Map<string, string>();
+  for (const p of PERMISSION_CATALOG) {
+    const created = await prisma.permission.upsert({
+      where: { key: p.key },
+      update: { label: p.label, category: p.category },
+      create: { key: p.key, label: p.label, category: p.category },
+    });
+    permissionIdByKey.set(p.key, created.id);
+  }
+
+  for (const [role, keys] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {
+    if (role === "SUPER_ADMIN") continue; // bypasses permission checks entirely, nothing to seed
+    for (const key of keys) {
+      const permissionId = permissionIdByKey.get(key);
+      if (!permissionId) continue;
+      await prisma.rolePermission.upsert({
+        where: { role_permissionId: { role: role as Role, permissionId } },
+        update: {},
+        create: { role: role as Role, permissionId },
+      });
+    }
+  }
 
   // ── Courses / Modules / Lessons ─────────────────────────────────────
   type LessonSeed = {
@@ -305,6 +331,10 @@ async function main() {
   ];
 
   const courseIdBySlug = new Map<string, string>();
+  const courseCoverImage: Record<string, string> = {
+    "planted-identity-foundations":
+      "https://images.unsplash.com/photo-1712342109846-a8fcb1c883ba?w=1600&q=80&auto=format&fit=crop",
+  };
 
   for (const [i, c] of courseSeeds.entries()) {
     const course = await prisma.course.upsert({
@@ -318,6 +348,7 @@ async function main() {
         description: c.description,
         stage: c.stage,
         order: i,
+        coverImage: courseCoverImage[c.slug] ?? null,
       },
     });
     courseIdBySlug.set(c.slug, course.id);
@@ -414,6 +445,56 @@ async function main() {
       sphereOfInfluence: "Education",
       onboardedAt: new Date(),
     },
+  });
+
+  const superAdmin = await prisma.user.upsert({
+    where: { email: "superadmin@kingdomtribecity.org" },
+    update: {},
+    create: {
+      email: "superadmin@kingdomtribecity.org",
+      name: "Kingdom Tribe City Ops",
+      passwordHash,
+      role: "SUPER_ADMIN",
+      stage: "SENT",
+      sphereOfInfluence: "Ministry",
+      onboardedAt: new Date(),
+    },
+  });
+
+  const ministryLeader = await prisma.user.upsert({
+    where: { email: "leader@kingdomtribecity.org" },
+    update: {},
+    create: {
+      email: "leader@kingdomtribecity.org",
+      name: "Pastor Deborah Iyabo",
+      passwordHash,
+      role: "MINISTRY_LEADER",
+      stage: "SENT",
+      sphereOfInfluence: "Ministry",
+      onboardedAt: new Date(),
+    },
+  });
+
+  const instructor = await prisma.user.upsert({
+    where: { email: "instructor@kingdomtribecity.org" },
+    update: {},
+    create: {
+      email: "instructor@kingdomtribecity.org",
+      name: "Dr. Samuel Okoye",
+      passwordHash,
+      role: "INSTRUCTOR",
+      stage: "FRUITFUL",
+      sphereOfInfluence: "Education",
+      onboardedAt: new Date(),
+    },
+  });
+  void superAdmin;
+  void ministryLeader;
+
+  // Give the demo instructor a course of their own, to demonstrate admin scoping.
+  await prisma.course.updateMany({
+    where: { slug: "formed-the-renewed-mind" },
+    data: { authorId: instructor.id },
   });
 
   const demoStudent = await prisma.user.upsert({
@@ -725,8 +806,14 @@ async function main() {
       slug: "walking-in-sonship",
       title: "Walking in Sonship",
       description: "A short teaching on trading the orphan mindset for sonship.",
-      type: "TEACHING" as const,
+      type: "ARTICLE" as const,
       category: "IDENTITY" as const,
+      tags: ["identity", "sonship", "planted"],
+      visibility: "PUBLIC" as const,
+      programId: plantedAndRooted.id,
+      speakerId: speaker.id,
+      coverImage:
+        "https://images.unsplash.com/photo-1712342109846-a8fcb1c883ba?w=1200&q=80&auto=format&fit=crop",
     },
     {
       slug: "a-simple-prayer-rhythm",
@@ -734,6 +821,12 @@ async function main() {
       description: "A practical daily structure for building consistency in prayer.",
       type: "DEVOTIONAL" as const,
       category: "PRAYER" as const,
+      tags: ["prayer", "rhythm", "rooted"],
+      visibility: "PUBLIC" as const,
+      programId: plantedAndRooted.id,
+      speakerId: speaker.id,
+      coverImage:
+        "https://plus.unsplash.com/premium_photo-1770544880707-f293de8c28fa?w=1200&q=80&auto=format&fit=crop",
     },
     {
       slug: "leading-from-character",
@@ -741,6 +834,12 @@ async function main() {
       description: "Why Kingdom leadership starts with formation, not skill.",
       type: "ARTICLE" as const,
       category: "LEADERSHIP" as const,
+      tags: ["leadership", "character"],
+      visibility: "LEADERS" as const,
+      programId: kingdomLeaders.id,
+      speakerId: speaker.id,
+      coverImage:
+        "https://images.unsplash.com/photo-1600880292089-90a7e086ee0c?w=1200&q=80&auto=format&fit=crop",
     },
     {
       slug: "discovering-your-assignment",
@@ -748,6 +847,11 @@ async function main() {
       description: "A guided study on uncovering purpose and calling.",
       type: "STUDY" as const,
       category: "PURPOSE" as const,
+      tags: ["purpose", "calling", "fruitful"],
+      visibility: "STUDENTS" as const,
+      programId: plantedAndRooted.id,
+      speakerId: speaker.id,
+      coverImage: null,
     },
     {
       slug: "marriage-and-the-kingdom",
@@ -755,6 +859,11 @@ async function main() {
       description: "A sermon on building Kingdom-centered marriages and homes.",
       type: "SERMON" as const,
       category: "RELATIONSHIPS" as const,
+      tags: ["marriage", "family"],
+      visibility: "PUBLIC" as const,
+      programId: null,
+      speakerId: speaker.id,
+      coverImage: null,
     },
     {
       slug: "the-renewed-mind-devotional",
@@ -762,6 +871,38 @@ async function main() {
       description: "Seven days of Scripture and reflection on Romans 12:2.",
       type: "DEVOTIONAL" as const,
       category: "SPIRITUAL_GROWTH" as const,
+      tags: ["renewal", "mind", "formed"],
+      visibility: "PUBLIC" as const,
+      programId: plantedAndRooted.id,
+      speakerId: speaker.id,
+      coverImage: null,
+    },
+    {
+      slug: "revival-night-highlights",
+      title: "Revival Night Highlights",
+      description: "Watch the highlight reel from the last Young & Yielded revival night.",
+      type: "YOUTUBE" as const,
+      category: "SPIRITUAL_GROWTH" as const,
+      tags: ["youth", "revival", "worship"],
+      visibility: "PUBLIC" as const,
+      programId: youngAndYielded.id,
+      speakerId: null,
+      externalUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      coverImage:
+        "https://images.unsplash.com/photo-1691491071054-6371dfc47d6e?w=1200&q=80&auto=format&fit=crop",
+    },
+    {
+      slug: "kingdom-warrior-woman-workbook",
+      title: "Kingdom Warrior Woman Workbook",
+      description: "A companion workbook for the Kingdom Warrior Woman gatherings.",
+      type: "WORKBOOK" as const,
+      category: "IDENTITY" as const,
+      tags: ["women", "identity", "workbook"],
+      visibility: "MEMBERS" as const,
+      programId: kingdomWarriorWoman.id,
+      speakerId: null,
+      coverImage:
+        "https://plus.unsplash.com/premium_photo-1706026427244-3b3df84382d8?w=1200&q=80&auto=format&fit=crop",
     },
   ];
 
@@ -787,9 +928,12 @@ async function main() {
 
   console.log("Seed complete.");
   console.log("Demo logins (password: KingdomDemo!23):");
-  console.log("  admin@kingdomtribecity.org   (ADMIN)");
+  console.log("  superadmin@kingdomtribecity.org (SUPER_ADMIN)");
+  console.log("  admin@kingdomtribecity.org      (ADMIN)");
+  console.log("  leader@kingdomtribecity.org     (MINISTRY_LEADER)");
+  console.log("  instructor@kingdomtribecity.org (INSTRUCTOR)");
   console.log("  mentor.deborah@kingdomtribecity.org (MENTOR)");
-  console.log("  student@kingdomtribecity.org (STUDENT)");
+  console.log("  student@kingdomtribecity.org    (STUDENT)");
   void admin;
 }
 

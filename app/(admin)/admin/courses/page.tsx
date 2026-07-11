@@ -15,13 +15,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createCourseAction } from "@/lib/actions/admin";
+import { requirePermission } from "@/lib/rbac";
+import { PERMISSIONS } from "@/lib/permissions";
 import { STAGE_ORDER, STAGE_META } from "@/lib/stage";
 
 export const metadata: Metadata = { title: "Courses" };
 
 export default async function AdminCoursesPage() {
+  const user = await requirePermission(PERMISSIONS.CONTENT_MANAGE);
+
   const [courses, programs] = await Promise.all([
     prisma.course.findMany({
+      where: user.role === "INSTRUCTOR" ? { authorId: user.id } : {},
       orderBy: { order: "asc" },
       include: { program: true, modules: { include: { lessons: true } } },
     }),

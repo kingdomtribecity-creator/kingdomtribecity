@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOutAction } from "@/lib/actions/auth";
 import { STAGE_META } from "@/lib/stage";
+import { ADMIN_AREA_ROLES, ROLE_LABEL } from "@/lib/permissions";
 import type { Role, Stage } from "@/lib/generated/prisma/enums";
 
 function initials(name: string | null | undefined) {
@@ -49,14 +50,14 @@ export function UserMenu({
           <p className="text-sm font-medium">{name}</p>
           <p className="text-xs font-normal text-muted-foreground">{email}</p>
           <p className="mt-1 text-xs font-normal text-muted-foreground">
-            {STAGE_META[stage].label} · {role.toLowerCase()}
+            {STAGE_META[stage].label} · {ROLE_LABEL[role]}
           </p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/dashboard">Dashboard</Link>
         </DropdownMenuItem>
-        {role === "ADMIN" && (
+        {ADMIN_AREA_ROLES.includes(role) && (
           <DropdownMenuItem asChild>
             <Link href="/admin">Admin</Link>
           </DropdownMenuItem>

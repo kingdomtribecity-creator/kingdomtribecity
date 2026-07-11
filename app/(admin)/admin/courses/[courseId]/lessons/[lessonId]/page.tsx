@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { updateLessonAction, deleteLessonAction } from "@/lib/actions/admin";
+import { requirePermission, ForbiddenError } from "@/lib/rbac";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default async function AdminLessonEditPage({
   params,
@@ -14,8 +16,15 @@ export default async function AdminLessonEditPage({
   params: Promise<{ courseId: string; lessonId: string }>;
 }) {
   const { courseId, lessonId } = await params;
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  const user = await requirePermission(PERMISSIONS.CONTENT_MANAGE);
+  const [lesson, course] = await Promise.all([
+    prisma.lesson.findUnique({ where: { id: lessonId } }),
+    prisma.course.findUnique({ where: { id: courseId }, select: { authorId: true } }),
+  ]);
   if (!lesson) notFound();
+  if (user.role === "INSTRUCTOR" && course?.authorId !== user.id) {
+    throw new ForbiddenError("You can only edit your own courses.");
+  }
 
   const boundUpdate = updateLessonAction.bind(null, lessonId, courseId);
   const boundDelete = deleteLessonAction.bind(null, lessonId, courseId);

@@ -10,10 +10,14 @@ import {
   createTribeAction,
 } from "@/lib/actions/admin";
 import { TribeMentorSelect } from "@/components/admin/tribe-mentor-select";
+import { requirePermission } from "@/lib/rbac";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Cohorts & Tribes" };
 
 export default async function AdminCohortsPage() {
+  await requirePermission(PERMISSIONS.COHORTS_MANAGE);
+
   const [cohorts, mentors] = await Promise.all([
     prisma.cohort.findMany({
       orderBy: { startDate: "desc" },
@@ -21,7 +25,10 @@ export default async function AdminCohortsPage() {
         tribes: { include: { mentor: true, _count: { select: { members: true } } } },
       },
     }),
-    prisma.user.findMany({ where: { role: { in: ["MENTOR", "ADMIN"] } }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({
+      where: { role: { in: ["MENTOR", "ADMIN", "SUPER_ADMIN", "MINISTRY_LEADER"] } },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   return (

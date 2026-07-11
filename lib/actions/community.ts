@@ -10,7 +10,7 @@ import {
 
 async function assertTribeAccess(userId: string, tribeId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (user?.role === "ADMIN") return;
+  if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") return;
 
   const tribe = await prisma.tribe.findUnique({ where: { id: tribeId } });
   if (tribe?.mentorId === userId) return;
@@ -90,7 +90,12 @@ export async function markPrayerAnsweredAction(prayerId: string, tribeSlug: stri
   const user = await requireUser();
   const prayer = await prisma.prayerRequest.findUnique({ where: { id: prayerId } });
   if (!prayer) return;
-  if (prayer.userId !== user.id && user.role !== "ADMIN" && user.role !== "MENTOR") return;
+  const canModerate =
+    prayer.userId === user.id ||
+    user.role === "ADMIN" ||
+    user.role === "SUPER_ADMIN" ||
+    user.role === "MENTOR";
+  if (!canModerate) return;
 
   await prisma.prayerRequest.update({
     where: { id: prayerId },

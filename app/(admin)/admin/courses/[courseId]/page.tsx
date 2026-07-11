@@ -19,6 +19,8 @@ import {
   createModuleAction,
   createLessonAction,
 } from "@/lib/actions/admin";
+import { requirePermission, ForbiddenError } from "@/lib/rbac";
+import { PERMISSIONS } from "@/lib/permissions";
 import { STAGE_ORDER, STAGE_META } from "@/lib/stage";
 
 export default async function AdminCourseEditPage({
@@ -27,12 +29,16 @@ export default async function AdminCourseEditPage({
   params: Promise<{ courseId: string }>;
 }) {
   const { courseId } = await params;
+  const user = await requirePermission(PERMISSIONS.CONTENT_MANAGE);
   const course = await prisma.course.findUnique({
     where: { id: courseId },
     include: {
       modules: { orderBy: { order: "asc" }, include: { lessons: { orderBy: { order: "asc" } } } },
     },
   });
+  if (course && user.role === "INSTRUCTOR" && course.authorId !== user.id) {
+    throw new ForbiddenError("You can only edit your own courses.");
+  }
   if (!course) notFound();
 
   const boundUpdate = updateCourseAction.bind(null, courseId);

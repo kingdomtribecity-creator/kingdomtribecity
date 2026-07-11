@@ -15,10 +15,14 @@ datasource db {
 // ─────────────────────────────────────────────────────────────────────────
 
 enum Role {
-  GUEST
-  STUDENT
-  MENTOR
+  SUPER_ADMIN
   ADMIN
+  MINISTRY_LEADER
+  INSTRUCTOR
+  MENTOR
+  STUDENT
+  MEMBER
+  GUEST
 }
 
 enum Stage {
@@ -63,11 +67,74 @@ model User {
   eventRegistrations EventRegistration[]
   transactions       Transaction[]
 
+  authoredCourses  Course[]     @relation("CourseAuthor")
+  createdResources Resource[]   @relation("ResourceCreator")
+  uploadedMedia    MediaAsset[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([role])
   @@index([stage])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Permissions — scalable RBAC: roles are a fixed enum, but which
+// permissions each role grants is data (editable at /admin/settings/roles)
+// so new capabilities don't require a code change or redeploy.
+// ─────────────────────────────────────────────────────────────────────────
+
+model Permission {
+  id       String @id @default(cuid())
+  key      String @unique
+  label    String
+  category String
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  id           String @id @default(cuid())
+  role         Role
+  permissionId String
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@index([role])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Media — the generic library backing every upload (Cloudflare R2)
+// ─────────────────────────────────────────────────────────────────────────
+
+enum MediaKind {
+  VIDEO
+  AUDIO
+  IMAGE
+  DOCUMENT
+}
+
+model MediaAsset {
+  id           String    @id @default(cuid())
+  key          String    @unique
+  url          String
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  kind         MediaKind
+  durationSec  Int?
+  width        Int?
+  height       Int?
+
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  resources Resource[] @relation("ResourceMedia")
+
+  createdAt DateTime @default(now())
+
+  @@index([kind])
 }
 
 model Account {
@@ -125,8 +192,9 @@ model Program {
   description String
   heroImage   String?
 
-  courses Course[]
-  events  Event[]
+  courses   Course[]
+  events    Event[]
+  resources Resource[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -135,6 +203,7 @@ model Program {
 model Course {
   id          String  @id @default(cuid())
   programId   String
+  authorId    String?
   slug        String  @unique
   title       String
   subtitle    String?
@@ -145,6 +214,7 @@ model Course {
   published   Boolean @default(true)
 
   program      Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  author       User?         @relation("CourseAuthor", fields: [authorId], references: [id], onDelete: SetNull)
   modules      Module[]
   enrollments  Enrollment[]
   certificates Certificate[]
@@ -153,6 +223,7 @@ model Course {
   updatedAt DateTime @updatedAt
 
   @@index([programId])
+  @@index([authorId])
 }
 
 model Module {
@@ -412,7 +483,8 @@ model Speaker {
   bio   String?
   image String?
 
-  events Event[]
+  events    Event[]
+  resources Resource[]
 }
 
 model Event {
@@ -455,11 +527,22 @@ model EventRegistration {
 // ─────────────────────────────────────────────────────────────────────────
 
 enum ResourceType {
-  TEACHING
+  VIDEO
+  AUDIO
   SERMON
-  ARTICLE
+  PDF
+  EBOOK
+  DOCUMENT
   STUDY
+  WORKBOOK
   DEVOTIONAL
+  ARTICLE
+  EXTERNAL_LINK
+  YOUTUBE
+  EVENT_RECORDING
+  LIVE_REPLAY
+  IMAGE
+  TEACHING_NOTE
 }
 
 enum ResourceCategory {
@@ -471,21 +554,50 @@ enum ResourceCategory {
   SPIRITUAL_GROWTH
 }
 
+/** Who can see a resource once it's published. */
+enum ResourceVisibility {
+  PUBLIC
+  MEMBERS
+  STUDENTS
+  LEADERS
+}
+
 model Resource {
-  id          String           @id @default(cuid())
-  slug        String           @unique
+  id          String             @id @default(cuid())
+  slug        String             @unique
   title       String
   description String
   type        ResourceType
   category    ResourceCategory
-  mediaUrl    String?
+  tags        String[]
+  visibility  ResourceVisibility @default(PUBLIC)
   coverImage  String?
-  published   Boolean          @default(true)
+  externalUrl String?
+  published   Boolean            @default(true)
+  viewCount   Int                @default(0)
+
+  speakerId String?
+  speaker   Speaker? @relation(fields: [speakerId], references: [id], onDelete: SetNull)
+
+  programId String?
+  program   Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
+
+  mediaAssetId String?
+  mediaAsset   MediaAsset? @relation("ResourceMedia", fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("ResourceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  relatedTo  Resource[] @relation("RelatedResources")
+  relatedBy  Resource[] @relation("RelatedResources")
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([category])
   @@index([type])
+  @@index([visibility])
+  @@index([createdById])
 }
 
 // ─────────────────────────────────────────────────────────────────────────

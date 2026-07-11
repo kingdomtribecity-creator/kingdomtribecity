@@ -12,7 +12,7 @@ Read the founding docs first:
 
 ## Stack
 
-Next.js 16 (App Router) · TypeScript · Tailwind v4 + shadcn/ui (Radix) · Prisma 7 + PostgreSQL · Auth.js v5 · Stripe
+Next.js 16 (App Router) · TypeScript · Tailwind v4 + shadcn/ui (Radix) · Prisma 7 + PostgreSQL · Auth.js v5 · Stripe · Cloudflare R2
 
 ## Getting started
 
@@ -39,13 +39,16 @@ Seeded by `prisma/seed.ts`, password `KingdomDemo!23` for all:
 
 | Email | Role |
 |---|---|
-| `admin@kingdomtribecity.org` | Admin |
+| `superadmin@kingdomtribecity.org` | Super Administrator |
+| `admin@kingdomtribecity.org` | Administrator |
+| `leader@kingdomtribecity.org` | Ministry Leader |
+| `instructor@kingdomtribecity.org` | Instructor (owns the "Formed" course) |
 | `mentor.deborah@kingdomtribecity.org` | Mentor (Tribe Deborah) |
 | `student@kingdomtribecity.org` | Student (mid-course, in Tribe Deborah) |
 
 ### Environment variables
 
-See `.env` for the full list. `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` are optional in development — the `/give` flow degrades gracefully with a clear message when Stripe isn't configured.
+See `.env` for the full list. `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` and `R2_*` are optional in development — the `/give` flow and media uploads degrade gracefully with a clear message when they aren't configured.
 
 ## Scripts
 

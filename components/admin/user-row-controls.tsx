@@ -10,9 +10,8 @@ import {
 } from "@/components/ui/select";
 import { updateUserRoleAction, updateUserStageAction } from "@/lib/actions/admin";
 import { STAGE_ORDER, STAGE_META } from "@/lib/stage";
+import { ROLE_ORDER, ROLE_LABEL } from "@/lib/permissions";
 import type { Role, Stage } from "@/lib/generated/prisma/enums";
-
-const ROLES: Role[] = ["GUEST", "STUDENT", "MENTOR", "ADMIN"];
 
 export function UserRowControls({
   userId,
@@ -33,13 +32,13 @@ export function UserRowControls({
           startTransition(() => updateUserRoleAction(userId, v as Role))
         }
       >
-        <SelectTrigger size="sm" className="w-28">
+        <SelectTrigger size="sm" className="w-44">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {ROLES.map((r) => (
+          {ROLE_ORDER.map((r) => (
             <SelectItem key={r} value={r}>
-              {r}
+              {ROLE_LABEL[r]}
             </SelectItem>
           ))}
         </SelectContent>

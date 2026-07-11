@@ -37,7 +37,7 @@ export default async function TribePage({
 
   const isMember = tribe.members.some((m) => m.userId === user.id);
   const isMentor = tribe.mentorId === user.id;
-  const canAccess = isMember || isMentor || user.role === "ADMIN";
+  const canAccess = isMember || isMentor || user.role === "ADMIN" || user.role === "SUPER_ADMIN";
 
   if (!canAccess) {
     return (
@@ -74,7 +74,7 @@ export default async function TribePage({
           <PrayerRequestList
             tribeSlug={tribeSlug}
             prayers={tribe.prayerRequests}
-            canModerate={isMentor || user.role === "ADMIN"}
+            canModerate={isMentor || user.role === "ADMIN" || user.role === "SUPER_ADMIN"}
             currentUserId={user.id}
           />
         </TabsContent>

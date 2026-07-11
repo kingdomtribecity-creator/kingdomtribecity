@@ -1,4 +1,6 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { ADMIN_AREA_ROLES, type PermissionKey } from "@/lib/permissions";
 import type { Role } from "@/lib/generated/prisma/enums";
 
 export class UnauthorizedError extends Error {
@@ -29,9 +31,30 @@ export async function requireRole(...roles: Role[]) {
 }
 
 export async function requireAdmin() {
-  return requireRole("ADMIN");
+  return requireRole("ADMIN", "SUPER_ADMIN");
 }
 
 export async function requireMentorOrAdmin() {
-  return requireRole("MENTOR", "ADMIN");
+  return requireRole("MENTOR", "ADMIN", "SUPER_ADMIN");
+}
+
+/** Anyone allowed into /admin at all; individual pages scope further (e.g. instructors see only their own content). */
+export async function requireAdminArea() {
+  return requireRole(...ADMIN_AREA_ROLES);
+}
+
+/** SUPER_ADMIN always passes — every other role is looked up against the (editable) RolePermission table. */
+export async function hasPermission(role: Role, key: PermissionKey): Promise<boolean> {
+  if (role === "SUPER_ADMIN") return true;
+  const count = await prisma.rolePermission.count({
+    where: { role, permission: { key } },
+  });
+  return count > 0;
+}
+
+export async function requirePermission(key: PermissionKey) {
+  const user = await requireUser();
+  const allowed = await hasPermission(user.role, key);
+  if (!allowed) throw new ForbiddenError();
+  return user;
 }

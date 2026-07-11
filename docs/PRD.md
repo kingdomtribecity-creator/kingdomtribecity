@@ -91,11 +91,15 @@ Represents transformation, not percentages:
 | Role | Capability |
 |---|---|
 | `GUEST` | Public site only |
+| `MEMBER` | Registered, not yet enrolled — community/content access only |
 | `STUDENT` | Enroll, learn, journal, participate in their Tribe |
 | `MENTOR` | Student capabilities + view/guide their assigned Tribe |
-| `ADMIN` | Full platform management |
+| `INSTRUCTOR` | Create & manage their own courses and resources |
+| `MINISTRY_LEADER` | Manage content, programs, events, cohorts, announcements |
+| `ADMIN` | Full platform management, including users and roles |
+| `SUPER_ADMIN` | Everything, unconditionally — the one role permissions can't be revoked from |
 
-RBAC is enforced server-side on every mutation — never trusted from the client. See `ARCHITECTURE.md`.
+Which permissions each role grants (beyond the fixed role list itself) is data, not code — editable at `/admin/settings/roles` with no redeploy. RBAC is enforced server-side on every mutation — never trusted from the client. See `ARCHITECTURE.md`.
 
 ## 8. Success Metrics (what the Admin analytics overview tracks)
 

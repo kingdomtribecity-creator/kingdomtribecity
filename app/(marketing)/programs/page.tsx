@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { stageGradient } from "@/lib/gradients";
+import { PROGRAM_PHOTO } from "@/lib/photography";
 
 export const metadata: Metadata = { title: "Programs" };
 
@@ -38,10 +39,15 @@ export default async function ProgramsPage() {
       <div className="mt-14 grid gap-6 sm:grid-cols-2">
         {programs.map((program) => (
           <Card key={program.id} className="overflow-hidden border-border/60 py-0">
-            <div
-              className="h-28"
-              style={{ backgroundImage: stageGradient("PLANTED") }}
-            />
+            <div className="relative h-40">
+              <Image
+                src={PROGRAM_PHOTO[program.slug] ?? PROGRAM_PHOTO.PLANTED_AND_ROOTED}
+                alt=""
+                fill
+                sizes="(min-width: 640px) 50vw, 100vw"
+                className="object-cover"
+              />
+            </div>
             <CardContent className="p-6">
               <p className="font-heading text-xl font-medium">{program.name}</p>
               <p className="mt-2 text-sm text-muted-foreground">{program.tagline}</p>

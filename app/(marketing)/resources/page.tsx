@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CATEGORY_LABEL, TYPE_LABEL } from "@/lib/resource-labels";
+import { CATEGORY_LABEL, TYPE_LABEL, canViewResource } from "@/lib/resource-labels";
 import { cn } from "@/lib/utils";
 import type { ResourceCategory } from "@/lib/generated/prisma/enums";
 
@@ -17,13 +18,19 @@ export default async function ResourcesPage({
   const { category } = await searchParams;
   const activeCategory = category as ResourceCategory | undefined;
 
-  const resources = await prisma.resource.findMany({
-    where: {
-      published: true,
-      ...(activeCategory ? { category: activeCategory } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [session, resources] = await Promise.all([
+    auth(),
+    prisma.resource.findMany({
+      where: {
+        published: true,
+        ...(activeCategory ? { category: activeCategory } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  const role = session?.user?.role ?? null;
+  const visibleResources = resources.filter((r) => canViewResource(r.visibility, role));
 
   const categories = Object.entries(CATEGORY_LABEL) as [ResourceCategory, string][];
 
@@ -67,9 +74,13 @@ export default async function ResourcesPage({
       </div>
 
       <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {resources.map((r) => (
+        {visibleResources.map((r) => (
           <Link key={r.id} href={`/resources/${r.slug}`}>
-            <Card className="h-full border-border/60 transition-colors hover:border-primary/40">
+            <Card className="h-full overflow-hidden border-border/60 py-0 transition-colors hover:border-primary/40">
+              {r.coverImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={r.coverImage} alt="" className="h-36 w-full object-cover" />
+              )}
               <CardContent className="flex h-full flex-col p-6">
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="secondary">{TYPE_LABEL[r.type]}</Badge>
@@ -83,7 +94,7 @@ export default async function ResourcesPage({
         ))}
       </div>
 
-      {resources.length === 0 && (
+      {visibleResources.length === 0 && (
         <p className="mt-8 text-sm text-muted-foreground">No resources in this category yet.</p>
       )}
     </div>

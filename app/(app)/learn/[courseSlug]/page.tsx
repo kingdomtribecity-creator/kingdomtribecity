@@ -41,7 +41,12 @@ export default async function CourseDetailPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <CourseHero title={course.title} subtitle={course.subtitle} stage={course.stage} />
+      <CourseHero
+        title={course.title}
+        subtitle={course.subtitle}
+        stage={course.stage}
+        coverImage={course.coverImage}
+      />
 
       <p className="mt-8 text-muted-foreground">{course.description}</p>
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { ADMIN_AREA_ROLES } from "@/lib/permissions";
 
 const PROTECTED_PREFIXES = [
   "/dashboard",
@@ -22,7 +23,7 @@ export default auth((req) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  if (pathname.startsWith(ADMIN_PREFIX) && user.role !== "ADMIN") {
+  if (pathname.startsWith(ADMIN_PREFIX) && !ADMIN_AREA_ROLES.includes(user.role)) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin));
   }
 

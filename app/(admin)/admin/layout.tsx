@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/rbac";
+import { requireAdminArea } from "@/lib/rbac";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/app-shell/user-menu";
@@ -9,7 +9,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireAdmin();
+  const user = await requireAdminArea();
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -31,7 +31,7 @@ export default async function AdminLayout({
       </header>
       <div className="mx-auto flex w-full max-w-7xl flex-1 gap-8 px-4 py-8 sm:px-6">
         <aside className="hidden w-56 shrink-0 md:block">
-          <AdminNav />
+          <AdminNav role={user.role} />
         </aside>
         <main className="flex-1 min-w-0">{children}</main>
       </div>

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminArea } from "@/lib/rbac";
 import { StatTile } from "@/components/admin/stat-tile";
 import { StageBarChart } from "@/components/admin/stage-bar-chart";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +11,9 @@ import type { Stage } from "@/lib/generated/prisma/enums";
 export const metadata: Metadata = { title: "Admin Overview" };
 
 export default async function AdminOverviewPage() {
+  const user = await requireAdminArea();
+  if (user.role === "INSTRUCTOR") redirect("/admin/courses");
+
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 

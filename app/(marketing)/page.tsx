@@ -1,9 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PathwayStrip } from "@/components/marketing/pathway-strip";
 import { BRAND_GRADIENT } from "@/lib/gradients";
+import { PHOTOGRAPHY, PROGRAM_PHOTO } from "@/lib/photography";
 import { ArrowRight } from "lucide-react";
 
 export default async function HomePage() {
@@ -91,13 +93,54 @@ export default async function HomePage() {
           </div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {programs.map((program) => (
-              <Card key={program.id} className="border-border/60">
+              <Card key={program.id} className="overflow-hidden border-border/60 py-0">
+                <div className="relative h-28">
+                  <Image
+                    src={PROGRAM_PHOTO[program.slug] ?? PROGRAM_PHOTO.PLANTED_AND_ROOTED}
+                    alt=""
+                    fill
+                    sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+                    className="object-cover"
+                  />
+                </div>
                 <CardContent className="p-6">
                   <p className="font-heading text-lg font-medium">{program.name}</p>
                   <p className="mt-2 text-sm text-muted-foreground">{program.tagline}</p>
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Community */}
+      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
+            <Image
+              src={PHOTOGRAPHY.community}
+              alt="Members of a Kingdom Tribe City Tribe gathered in discussion"
+              fill
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-cover"
+            />
+          </div>
+          <div>
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              A family, not a crowd
+            </p>
+            <h2 className="mt-4 font-heading text-3xl font-semibold sm:text-4xl">
+              You don&apos;t walk this alone.
+            </h2>
+            <p className="mt-4 text-muted-foreground">
+              Every member is planted in a Tribe — a small, accountable
+              community inside a cohort, led by a mentor who knows your name.
+              Discussion, prayer, and testimony happen there every week, not
+              just on a screen.
+            </p>
+            <Button className="mt-6" variant="outline" asChild>
+              <Link href="/sign-up">Find your Tribe</Link>
+            </Button>
           </div>
         </div>
       </section>

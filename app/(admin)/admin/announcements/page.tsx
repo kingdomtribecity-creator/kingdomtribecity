@@ -11,10 +11,14 @@ import {
   togglePinAnnouncementAction,
   deleteAnnouncementAction,
 } from "@/lib/actions/admin";
+import { requirePermission } from "@/lib/rbac";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Announcements" };
 
 export default async function AdminAnnouncementsPage() {
+  await requirePermission(PERMISSIONS.ANNOUNCEMENTS_MANAGE);
+
   const announcements = await prisma.announcement.findMany({
     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
   });
