@@ -6,6 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { MediaUploader } from "@/components/admin/media-uploader";
 
 type ExistingProgram = {
@@ -13,8 +20,10 @@ type ExistingProgram = {
   name: string;
   tagline: string;
   description: string;
+  visionBody: string | null;
   heroImage: string | null;
   published: boolean;
+  featuredCourseId: string | null;
 };
 
 export function ProgramForm({
@@ -22,11 +31,13 @@ export function ProgramForm({
   mode,
   program,
   storageConfigured,
+  ownCourses,
 }: {
   action: (formData: FormData) => void;
   mode: "create" | "edit";
   program?: ExistingProgram;
   storageConfigured: boolean;
+  ownCourses?: { id: string; title: string }[];
 }) {
   const [heroImage, setHeroImage] = useState(program?.heroImage ?? "");
 
@@ -50,7 +61,7 @@ export function ProgramForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="description">Description (Overview)</Label>
         <Textarea
           id="description"
           name="description"
@@ -59,6 +70,35 @@ export function ProgramForm({
           required
         />
       </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="visionBody">Vision</Label>
+        <Textarea
+          id="visionBody"
+          name="visionBody"
+          rows={3}
+          defaultValue={program?.visionBody ?? ""}
+          placeholder="The narrative shown on this Expression's Hub page — falls back to the tagline if left blank."
+        />
+      </div>
+
+      {mode === "edit" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="featuredCourseId">Featured course</Label>
+          <Select name="featuredCourseId" defaultValue={program?.featuredCourseId ?? undefined}>
+            <SelectTrigger id="featuredCourseId" className="w-full">
+              <SelectValue placeholder="First published course (default)" />
+            </SelectTrigger>
+            <SelectContent>
+              {(ownCourses ?? []).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label>Hero image</Label>

@@ -185,15 +185,82 @@ model Program {
   name        String
   tagline     String
   description String
+  /** Hub page "Vision" narrative block; falls back to tagline when unset. */
+  visionBody  String?
   heroImage   String?
   published   Boolean @default(true)
+
+  featuredCourseId String?
+  featuredCourse   Course? @relation("ProgramFeaturedCourse", fields: [featuredCourseId], references: [id], onDelete: SetNull)
 
   courses   Course[]
   events    Event[]
   resources Resource[]
+  testimonies Testimony[]
+  faqs      ProgramFaq[]
+
+  /** "Also featured in" — Products owned by another Program that this Expression's Hub also surfaces. */
+  featuredCourses   ProgramCourseFeature[]
+  featuredEvents    ProgramEventFeature[]
+  featuredResources ProgramResourceFeature[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/** Ordered Q&A list rendered on an Expression's Hub page. */
+model ProgramFaq {
+  id        String  @id @default(cuid())
+  programId String
+  question  String
+  answer    String
+  order     Int     @default(0)
+
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([programId])
+}
+
+/** Lets a Course owned by one Program also be surfaced on another Program's Hub, without duplicating the row. */
+model ProgramCourseFeature {
+  id        String   @id @default(cuid())
+  programId String
+  courseId  String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, courseId])
+}
+
+/** Lets an Event owned by one Program also be surfaced on another Program's Hub, without duplicating the row. */
+model ProgramEventFeature {
+  id        String   @id @default(cuid())
+  programId String
+  eventId   String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, eventId])
+}
+
+/** Lets a Resource owned by one Program also be surfaced on another Program's Hub, without duplicating the row. */
+model ProgramResourceFeature {
+  id         String   @id @default(cuid())
+  programId  String
+  resourceId String
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  program  Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, resourceId])
 }
 
 enum CourseStatus {
@@ -260,6 +327,11 @@ model Course {
   enrollments  Enrollment[]
   certificates Certificate[]
   cohorts      Cohort[]
+
+  /** Programs whose Hub features this course as its "Featured Course" (in addition to its owning program). */
+  featuredByPrograms Program[]              @relation("ProgramFeaturedCourse")
+  /** Programs whose Hub also surfaces this course alongside its owning program. */
+  featuredIn         ProgramCourseFeature[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -612,18 +684,22 @@ model PrayerRequest {
 }
 
 model Testimony {
-  id       String  @id @default(cuid())
-  userId   String
-  title    String
-  body     String
-  featured Boolean @default(false)
-  approved Boolean @default(false)
+  id        String  @id @default(cuid())
+  userId    String
+  /** The Expression this story is about, if any — powers the Hub's Testimonials section. */
+  programId String?
+  title     String
+  body      String
+  featured  Boolean @default(false)
+  approved  Boolean @default(false)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
   @@index([approved, featured])
+  @@index([programId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -659,6 +735,8 @@ model Event {
   speakers Speaker[]
 
   registrations EventRegistration[]
+  /** Programs (other than the owning one) whose Hub also surfaces this event. */
+  featuredIn    ProgramEventFeature[]
 
   createdAt DateTime @default(now())
 
@@ -749,6 +827,8 @@ model Resource {
   relatedBy  Resource[] @relation("RelatedResources")
 
   lessonAttachments LessonResource[]
+  /** Programs (other than the owning one) whose Hub also surfaces this resource. */
+  featuredIn        ProgramResourceFeature[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -2,9 +2,9 @@ import Link from "next/link";
 
 const COLUMNS = [
   {
-    title: "Ecosystem",
+    title: "Expressions",
     links: [
-      { href: "/programs", label: "Rooted and Built" },
+      { href: "/expressions/rooted-and-built", label: "Rooted and Built" },
       { href: "/expressions/young-and-yielded", label: "Young & Yielded" },
       { href: "/expressions/kingdom-warrior-woman", label: "Kingdom Warrior Woman" },
       { href: "/expressions/kingdom-leaders", label: "Kingdom Leaders" },
@@ -13,6 +13,7 @@ const COLUMNS = [
   {
     title: "Explore",
     links: [
+      { href: "/courses", label: "Courses" },
       { href: "/events", label: "Events" },
       { href: "/resources", label: "Resource Library" },
       { href: "/testimonies", label: "Testimonies" },

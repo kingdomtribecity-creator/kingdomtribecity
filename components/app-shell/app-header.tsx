@@ -24,8 +24,8 @@ export function AppHeader({
             Kingdom Tribe City
           </Link>
           <nav className="hidden items-center gap-6 md:flex">
-            <NavLink href="/dashboard">Dashboard</NavLink>
-            <NavLink href="/learn">Learn</NavLink>
+            <NavLink href="/dashboard">Home</NavLink>
+            <NavLink href="/learn">Journey</NavLink>
             {tribeHref && <NavLink href={tribeHref}>My Tribe</NavLink>}
             <NavLink href="/resources">Resources</NavLink>
             <NavLink href="/events">Events</NavLink>

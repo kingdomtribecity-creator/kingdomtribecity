@@ -6,7 +6,8 @@ import { MobileNav } from "@/components/marketing/mobile-nav";
 
 const NAV_LINKS = [
   { href: "/vision", label: "Vision" },
-  { href: "/programs", label: "Programs" },
+  { href: "/expressions", label: "Expressions" },
+  { href: "/courses", label: "Courses" },
   { href: "/events", label: "Events" },
   { href: "/testimonies", label: "Testimonies" },
   { href: "/resources", label: "Resources" },

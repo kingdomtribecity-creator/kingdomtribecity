@@ -32,6 +32,8 @@ async function main() {
     tagline: "The foundation discipleship school of Kingdom Tribe City.",
     description:
       "Rooted and Built takes believers from spiritual infancy into maturity and Kingdom assignment — walking the full Planted → Rooted → Formed → Fruitful pathway inside a single, cohort-based course.",
+    visionBody:
+      "We believe every believer is meant to be planted deep, rooted in intimacy with God, formed in character, and sent out fruitful into every sphere of society. Rooted and Built exists to walk you through that whole journey — not alone, but inside a Tribe that knows your name.",
   };
   const rootedAndBuilt = await prisma.program.upsert({
     where: { slug: "rooted-and-built" },
@@ -488,6 +490,41 @@ async function main() {
     },
   });
 
+  await prisma.program.update({
+    where: { id: rootedAndBuilt.id },
+    data: { featuredCourseId: rootedAndBuiltCourse.id },
+  });
+
+  for (const mentorUser of [mentorDeborah, mentorDaniel, mentorEsther]) {
+    await prisma.courseMentor.upsert({
+      where: { courseId_userId: { courseId: rootedAndBuiltCourse.id, userId: mentorUser.id } },
+      update: {},
+      create: { courseId: rootedAndBuiltCourse.id, userId: mentorUser.id },
+    });
+  }
+
+  const rootedAndBuiltFaqs = [
+    {
+      question: "Do I need any prior Bible knowledge to start?",
+      answer: "No — Rooted and Built is built for spiritual infancy through maturity. Come as you are.",
+    },
+    {
+      question: "Is this self-paced or do I need to keep up with a group?",
+      answer: "It's cohort-based — you walk through it alongside a Tribe, with a mentor, on a shared twelve-week rhythm.",
+    },
+    {
+      question: "Is there a certificate when I finish?",
+      answer: "Yes — completing every lesson in Rooted and Built issues a certificate you can view and share from your dashboard.",
+    },
+  ];
+  for (const [i, faq] of rootedAndBuiltFaqs.entries()) {
+    await prisma.programFaq.upsert({
+      where: { id: `${rootedAndBuilt.id}-seed-faq-${i}` },
+      update: {},
+      create: { id: `${rootedAndBuilt.id}-seed-faq-${i}`, programId: rootedAndBuilt.id, ...faq, order: i },
+    });
+  }
+
   const lessonIdBySlug = new Map<string, string>();
 
   for (const [mi, m] of moduleSeeds.entries()) {
@@ -638,6 +675,16 @@ async function main() {
       },
     });
   }
+
+  // Cross-Expression discovery: Kingdom Leaders Intensive is owned by the
+  // Kingdom Leaders program, but it's also relevant to Rooted and Built
+  // graduates stepping into their Kingdom Assignment — feature it on that
+  // Hub too, without duplicating the course row.
+  await prisma.programCourseFeature.upsert({
+    where: { programId_courseId: { programId: rootedAndBuilt.id, courseId: leadersIntensive.id } },
+    update: {},
+    create: { programId: rootedAndBuilt.id, courseId: leadersIntensive.id, order: 0 },
+  });
 
   // ── Cohort & Tribes ──────────────────────────────────────────────────
   const cohort = await prisma.cohort.upsert({
@@ -829,10 +876,11 @@ async function main() {
   // ── Testimonies ──────────────────────────────────────────────────────
   await prisma.testimony.upsert({
     where: { id: "seed-testimony-1" },
-    update: {},
+    update: { programId: rootedAndBuilt.id },
     create: {
       id: "seed-testimony-1",
       userId: demoStudent.id,
+      programId: rootedAndBuilt.id,
       title: "I finally understand who I am",
       body: "Rooted and Built didn't just teach me facts about identity — it walked with me until I actually believed them. For the first time, I'm not striving to become someone God already says I am.",
       featured: true,
@@ -843,10 +891,11 @@ async function main() {
 
   await prisma.testimony.upsert({
     where: { id: "seed-testimony-2" },
-    update: {},
+    update: { programId: rootedAndBuilt.id },
     create: {
       id: "seed-testimony-2",
       userId: extraStudents[2].id,
+      programId: rootedAndBuilt.id,
       title: "My Tribe became my family",
       body: "I moved to a new city with no community. Tribe Esther prayed with me through the hardest season of my life and never let me walk it alone.",
       featured: true,
@@ -1014,7 +1063,7 @@ async function main() {
   for (const r of resourceSeeds) {
     const created = await prisma.resource.upsert({
       where: { slug: r.slug },
-      update: {},
+      update: r,
       create: r,
     });
     resourceIdBySlug.set(r.slug, created.id);
@@ -1031,15 +1080,15 @@ async function main() {
   }
 
   // ── Announcements ────────────────────────────────────────────────────
+  const announcementData = {
+    title: "Rooted and Built Cohort One registration is open",
+    body: "Rooted and Built Cohort One is now open for new members. Invite someone who's ready to be planted.",
+    pinned: true,
+  };
   await prisma.announcement.upsert({
     where: { id: "seed-announcement-1" },
-    update: {},
-    create: {
-      id: "seed-announcement-1",
-      title: "Rooted and Built Cohort One registration is open",
-      body: "Rooted and Built Cohort One is now open for new members. Invite someone who's ready to be planted.",
-      pinned: true,
-    },
+    update: announcementData,
+    create: { id: "seed-announcement-1", ...announcementData },
   });
 
   console.log("Seed complete.");

@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PathwayStrip } from "@/components/marketing/pathway-strip";
+import { ExpressionCard } from "@/components/marketing/expression-card";
 import { BRAND_GRADIENT } from "@/lib/gradients";
-import { PHOTOGRAPHY, PROGRAM_PHOTO } from "@/lib/photography";
-import { ArrowRight } from "lucide-react";
+import { PHOTOGRAPHY } from "@/lib/photography";
+import { ArrowRight, Megaphone } from "lucide-react";
 
 export default async function HomePage() {
-  const [programs, testimonies, upcomingEvent] = await Promise.all([
+  const [programs, testimonies, upcomingEvent, announcements] = await Promise.all([
     prisma.program.findMany({ where: { published: true }, orderBy: { name: "asc" } }),
     prisma.testimony.findMany({
       where: { approved: true, featured: true },
@@ -21,10 +22,31 @@ export default async function HomePage() {
       where: { startsAt: { gte: new Date() } },
       orderBy: { startsAt: "asc" },
     }),
+    prisma.announcement.findMany({
+      where: { published: true, cohortId: null },
+      orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+      take: 1,
+    }),
   ]);
 
   return (
     <div>
+      {/* Kingdom Pulse */}
+      {announcements.length > 0 && (
+        <div className="border-b border-border/60 bg-primary/5">
+          <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
+            <Megaphone className="size-4 shrink-0 text-primary" />
+            <p className="text-sm">
+              <span className="mr-2 text-xs font-medium uppercase tracking-[0.15em] text-primary">
+                Kingdom Pulse
+              </span>
+              <span className="font-medium">{announcements[0].title}</span>{" "}
+              <span className="text-muted-foreground">{announcements[0].body}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Hero */}
       <section className="relative overflow-hidden text-white">
         <Image
@@ -91,29 +113,17 @@ export default async function HomePage() {
               One city, many expressions
             </h2>
             <Link
-              href="/programs"
+              href="/expressions"
               className="hidden shrink-0 text-sm text-muted-foreground hover:text-foreground sm:inline"
             >
-              View all programs →
+              View all expressions →
             </Link>
           </div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {programs.map((program) => (
-              <Card key={program.id} className="overflow-hidden border-border/60 py-0">
-                <div className="relative h-28">
-                  <Image
-                    src={PROGRAM_PHOTO[program.slug] ?? PHOTOGRAPHY.community}
-                    alt=""
-                    fill
-                    sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-                    className="object-cover"
-                  />
-                </div>
-                <CardContent className="p-6">
-                  <p className="font-heading text-lg font-medium">{program.name}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">{program.tagline}</p>
-                </CardContent>
-              </Card>
+              <Link key={program.id} href={`/expressions/${program.slug}`}>
+                <ExpressionCard program={program} compact />
+              </Link>
             ))}
           </div>
         </div>

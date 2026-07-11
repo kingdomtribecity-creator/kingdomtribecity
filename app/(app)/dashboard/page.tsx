@@ -11,7 +11,7 @@ import { JournalPanel } from "@/components/dashboard/journal-panel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, CalendarDays } from "lucide-react";
+import { ArrowRight, CalendarDays, Megaphone, MessageCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -23,30 +23,67 @@ const TRACK_STATUS_STYLE: Record<TrackStatus, string> = {
   Upcoming: "text-muted-foreground",
 };
 
+function timeOfDayGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 export default async function DashboardPage() {
   const user = await requireUser();
 
-  const [enrollments, allProgress, journalEntries, upcomingRegistrations] = await Promise.all([
-    prisma.enrollment.findMany({
-      where: { userId: user.id },
-      include: {
-        course: {
-          include: { modules: { include: { lessons: true } } },
+  const [enrollments, allProgress, journalEntries, upcomingRegistrations, announcements, tribeMembership] =
+    await Promise.all([
+      prisma.enrollment.findMany({
+        where: { userId: user.id },
+        include: {
+          course: {
+            include: { modules: { include: { lessons: true } }, program: true },
+          },
         },
+      }),
+      prisma.lessonProgress.findMany({ where: { userId: user.id } }),
+      prisma.journalEntry.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { lesson: { select: { title: true } } },
+      }),
+      prisma.eventRegistration.findMany({
+        where: { userId: user.id, event: { startsAt: { gte: new Date() } } },
+        include: { event: true },
+        orderBy: { event: { startsAt: "asc" } },
+        take: 2,
+      }),
+      prisma.announcement.findMany({
+        where: { published: true, cohortId: null },
+        orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+        take: 2,
+      }),
+      prisma.tribeMembership.findFirst({
+        where: { userId: user.id },
+        include: { tribe: true },
+      }),
+    ]);
+
+  const enrolledProgramIds = enrollments.map((e) => e.course.program.id);
+
+  const [recentDiscussionPost, testimony] = await Promise.all([
+    tribeMembership
+      ? prisma.discussionPost.findFirst({
+          where: { tribeId: tribeMembership.tribeId },
+          orderBy: { createdAt: "desc" },
+          include: { user: { select: { name: true } } },
+        })
+      : Promise.resolve(null),
+    prisma.testimony.findFirst({
+      where: {
+        approved: true,
+        OR: [{ programId: { in: enrolledProgramIds } }, { featured: true }],
       },
-    }),
-    prisma.lessonProgress.findMany({ where: { userId: user.id } }),
-    prisma.journalEntry.findMany({
-      where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { lesson: { select: { title: true } } },
-    }),
-    prisma.eventRegistration.findMany({
-      where: { userId: user.id, event: { startsAt: { gte: new Date() } } },
-      include: { event: true },
-      orderBy: { event: { startsAt: "asc" } },
-      take: 3,
+      include: { user: { select: { name: true } } },
     }),
   ]);
 
@@ -104,13 +141,33 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">Welcome back,</p>
+          <p className="text-sm text-muted-foreground">{timeOfDayGreeting()},</p>
           <h1 className="font-heading text-3xl font-semibold">{user.name}</h1>
         </div>
         <StreakBadge streak={streak} />
       </div>
 
-      <Card className="mt-8 border-border/60">
+      {announcements.length > 0 && (
+        <div className="mt-6 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Kingdom Pulse
+          </p>
+          {announcements.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4"
+            >
+              <Megaphone className="mt-0.5 size-4 shrink-0 text-primary" />
+              <div>
+                <p className="text-sm font-medium">{a.title}</p>
+                <p className="text-sm text-muted-foreground">{a.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Card className="mt-6 border-border/60">
         <CardContent className="p-6 sm:p-8">
           <div className="flex items-center justify-between">
             <div>
@@ -127,7 +184,7 @@ export default async function DashboardPage() {
         <div className="space-y-6 lg:col-span-2">
           <Card className="border-border/60">
             <CardContent className="p-6">
-              <p className="text-sm font-medium text-muted-foreground">Continue learning</p>
+              <p className="text-sm font-medium text-muted-foreground">Continue your journey</p>
               {continueLearning ? (
                 <>
                   <p className="mt-2 font-heading text-xl font-medium">{continueLearning.lessonTitle}</p>
@@ -144,7 +201,7 @@ export default async function DashboardPage() {
                     You&apos;re not enrolled in a course yet.
                   </p>
                   <Button className="mt-4" asChild>
-                    <Link href="/learn">Browse courses</Link>
+                    <Link href="/learn">Browse the Journey</Link>
                   </Button>
                 </>
               )}
@@ -167,6 +224,25 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
+          {recentDiscussionPost && tribeMembership && (
+            <Card className="border-border/60">
+              <CardContent className="p-6">
+                <p className="text-sm font-medium text-muted-foreground">Community</p>
+                <Link
+                  href={`/tribe/${tribeMembership.tribe.slug}`}
+                  className="mt-3 flex items-start gap-3 rounded-lg border border-border/60 p-3 transition-colors hover:border-primary/40"
+                >
+                  <MessageCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">{recentDiscussionPost.user.name}</p>
+                    <p className="line-clamp-2 text-sm text-muted-foreground">{recentDiscussionPost.body}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">in {tribeMembership.tribe.name}</p>
+                  </div>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-border/60">
             <CardContent className="p-6">
               <p className="text-sm font-medium text-muted-foreground">Spiritual journal</p>
@@ -178,9 +254,25 @@ export default async function DashboardPage() {
         </div>
 
         <div className="space-y-6">
+          {testimony && (
+            <Card className="border-border/60">
+              <CardContent className="p-6">
+                <p className="text-sm font-medium text-muted-foreground">A story from the movement</p>
+                <div className="mt-3 flex items-start gap-3">
+                  <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-heading text-base font-medium">&ldquo;{testimony.title}&rdquo;</p>
+                    <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{testimony.body}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">— {testimony.user.name}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-border/60">
             <CardContent className="p-6">
-              <p className="text-sm font-medium text-muted-foreground">Upcoming</p>
+              <p className="text-sm font-medium text-muted-foreground">Upcoming Gathering</p>
               <div className="mt-4 space-y-3">
                 {upcomingRegistrations.map((r) => (
                   <Link
@@ -199,7 +291,7 @@ export default async function DashboardPage() {
                 ))}
                 {upcomingRegistrations.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No upcoming events yet.{" "}
+                    No upcoming gatherings yet.{" "}
                     <Link href="/events" className="underline underline-offset-4">
                       Browse events
                     </Link>
@@ -211,15 +303,20 @@ export default async function DashboardPage() {
 
           <Card className="border-border/60">
             <CardContent className="p-6">
-              <p className="text-sm font-medium text-muted-foreground">Explore resources</p>
+              <p className="text-sm font-medium text-muted-foreground">Explore the city</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Teachings and studies picked for where you are right now.
+                Teachings, studies, and expressions of the movement beyond your current course.
               </p>
-              <Button variant="outline" className="mt-4" asChild>
-                <Link href="/resources">
-                  Resource Library <Badge variant="secondary" className="ml-1">New</Badge>
-                </Link>
-              </Button>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/resources">
+                    Resource Library <Badge variant="secondary" className="ml-1">New</Badge>
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/expressions">Explore Expressions</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
