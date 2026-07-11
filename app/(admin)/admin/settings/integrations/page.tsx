@@ -73,10 +73,12 @@ export default async function AdminIntegrationsPage() {
         />
         <IntegrationCard
           title="Gmail"
-          description="Send via a Gmail account using an App Password (not your account password)."
+          description="Send via a Gmail account using Google OAuth — create an OAuth Client ID in Google Cloud Console, then generate a Refresh Token for it (e.g. via Google's OAuth Playground) with the gmail.send scope."
           fields={[
             { key: "gmailUser", label: "Gmail address", placeholder: "you@gmail.com" },
-            { key: "gmailAppPassword", label: "App password", secret: true, placeholder: "16-character app password" },
+            { key: "clientId", label: "OAuth Client ID", secret: true, placeholder: "xxxx.apps.googleusercontent.com" },
+            { key: "clientSecret", label: "OAuth Client Secret", secret: true },
+            { key: "refreshToken", label: "Refresh Token", secret: true },
             { key: "fromName", label: "From name (optional)", placeholder: "Kingdom Tribe City" },
           ]}
           existing={byProvider(email, "gmail")}

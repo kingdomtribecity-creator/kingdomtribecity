@@ -20,17 +20,22 @@ export async function sendTestEmail(provider: string, to: string): Promise<void>
   }
 
   if (provider === "gmail") {
-    if (!secrets.gmailUser || !secrets.gmailAppPassword) {
-      throw new Error("Gmail address and app password are required.");
+    if (!config.gmailUser) throw new Error("Gmail address is required.");
+    if (!secrets.clientId || !secrets.clientSecret || !secrets.refreshToken) {
+      throw new Error("Google OAuth Client ID, Client Secret, and Refresh Token are all required.");
     }
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      auth: { user: secrets.gmailUser, pass: secrets.gmailAppPassword },
+      service: "gmail",
+      auth: {
+        type: "OAuth2",
+        user: config.gmailUser,
+        clientId: secrets.clientId,
+        clientSecret: secrets.clientSecret,
+        refreshToken: secrets.refreshToken,
+      },
     });
     await transporter.sendMail({
-      from: config.fromName ? `${config.fromName} <${secrets.gmailUser}>` : secrets.gmailUser,
+      from: config.fromName ? `${config.fromName} <${config.gmailUser}>` : config.gmailUser,
       to,
       subject,
       text,
